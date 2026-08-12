@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional
 
@@ -15,9 +16,9 @@ class UserProfileResponse(BaseModel):
     name: str
     interests: List[str] = []
     preferences: UserPreferences
-    isOnboarded: bool = True
-    createdAt: str
-    updatedAt: str
+    isOnboarded: bool = False
+    createdAt: datetime
+    updatedAt: datetime
 
     class Config:
         populate_by_name = True

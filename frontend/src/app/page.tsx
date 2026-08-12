@@ -1,11 +1,12 @@
 "use client";
 import { useState } from "react";
-import { authClient } from "@/lib/auth-client";
+import { authClient, fetchBackendProfile } from "@/lib/auth-client";
 
 export default function Home() {
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+  const [apiStatus, setApiStatus] = useState("");
   
   const { data: session } = authClient.useSession();
   
@@ -30,13 +31,25 @@ export default function Home() {
     await authClient.signOut();
   }
 
+  const handleApiVerification = async () => {
+    setApiStatus("Verifying your token with EduFusion API...");
+    try {
+      const profile = await fetchBackendProfile();
+      setApiStatus(`API verified for ${profile.email}.`);
+    } catch (error) {
+      setApiStatus(error instanceof Error ? error.message : "API verification failed.");
+    }
+  };
+
   return (
     <main className="p-8">
       <h1 className="text-2xl font-bold mb-4">EduFusion Better Auth Demo</h1>
       {session ? (
         <div>
           <p>Logged in as {session.user.email}</p>
+          <button onClick={handleApiVerification} className="bg-blue-500 text-white p-2 rounded mt-2">Verify API access</button>
           <button onClick={handleSignOut} className="bg-red-500 text-white p-2 rounded mt-2">Sign Out</button>
+          {apiStatus && <p className="mt-2">{apiStatus}</p>}
         </div>
       ) : (
         <div className="flex flex-col gap-4 max-w-sm">

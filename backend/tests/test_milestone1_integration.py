@@ -1,7 +1,5 @@
 import pytest
 import pytest_asyncio
-import jwt
-from datetime import datetime, timezone, timedelta
 from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.core.config import settings
@@ -9,6 +7,7 @@ from app.core.database import connect_to_mongo, close_mongo_connection, db_insta
 
 from unittest.mock import patch
 from fastapi import HTTPException, status
+from pymongo.errors import ServerSelectionTimeoutError
 
 def mock_verify_jwt_token(token: str) -> dict:
     if token == "mock_valid_token_ganesh":
@@ -42,12 +41,16 @@ def patch_verify_jwt():
         yield
 
 
-@pytest_asyncio.fixture(autouse=True)
+@pytest_asyncio.fixture(scope="session", autouse=True)
 async def setup_db():
-    await connect_to_mongo()
-    # Clean test database collections
+    try:
+        await connect_to_mongo(database_name=settings.MONGODB_TEST_DB_NAME)
+    except ServerSelectionTimeoutError:
+        await close_mongo_connection()
+        pytest.skip("MongoDB is unavailable; Milestone 1 integration tests require MONGODB_URI.")
+
+    assert db_instance.db.name == settings.MONGODB_TEST_DB_NAME
     await db_instance.db["users"].delete_many({})
-    await db_instance.db["subjects"].delete_many({})
     yield
     await close_mongo_connection()
 
@@ -91,7 +94,7 @@ async def test_expired_token_returns_401():
 
 
 @pytest.mark.asyncio
-async def test_valid_token_provisions_user_and_creates_subject():
+async def test_valid_token_provisions_user():
     headers = {"Authorization": "Bearer mock_valid_token_ganesh"}
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
@@ -101,32 +104,14 @@ async def test_valid_token_provisions_user_and_creates_subject():
         user_data = me_res.json()
         assert user_data["authUserId"] == "auth_ganesh_001"
         assert user_data["email"] == "ganesh@example.com"
+        assert user_data["isOnboarded"] is False
         user_id = user_data["_id"]
 
         # Verify document exists in MongoDB Atlas 'users' collection
         user_in_db = await db_instance.db["users"].find_one({"authUserId": "auth_ganesh_001"})
         assert user_in_db is not None
         assert str(user_in_db["_id"]) == user_id
-
-        # 2. Create a subject for this user
-        subject_payload = {
-            "name": "Computer Architecture",
-            "description": "CPU design, pipelining, hazards"
-        }
-        create_res = await ac.post("/api/v1/subjects", json=subject_payload, headers=headers)
-        assert create_res.status_code == 201
-        subject_data = create_res.json()
-        assert subject_data["name"] == "Computer Architecture"
-        assert subject_data["ownerId"] == user_id
-
-        # Verify subject document in MongoDB Atlas 'subjects' collection
-        subj_in_db = await db_instance.db["subjects"].find_one({"ownerId": user_id})
-        assert subj_in_db is not None
-        assert subj_in_db["name"] == "Computer Architecture"
-
-        # 3. List subjects owned by this user
-        list_res = await ac.get("/api/v1/subjects", headers=headers)
-        assert list_res.status_code == 200
-        subjects_list = list_res.json()
-        assert len(subjects_list) == 1
-        assert subjects_list[0]["name"] == "Computer Architecture"
+        assert user_in_db["createdAt"].tzinfo is not None
+        indexes = await db_instance.db["users"].index_information()
+        assert indexes["authUserId_1"]["unique"] is True
+        assert indexes["email_1"]["unique"] is True

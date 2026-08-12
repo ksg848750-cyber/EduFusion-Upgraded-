@@ -229,7 +229,7 @@ If EduFusion presents a lesson or diagnosis, it can trace back to the exact chun
 
 ---
 
-## Applied Flow for MVP Scope (CPU Pipelining)
+## Validation/Demo Example: CPU Pipelining
 
 1. Student uploads `Computer_Architecture_Notes.pdf`.
 2. Backend parses 84 pages into 312 semantic chunks and stores embeddings in MongoDB Atlas Vector Search.

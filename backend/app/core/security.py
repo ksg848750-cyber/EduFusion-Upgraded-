@@ -20,8 +20,9 @@ def verify_jwt_token(token: str) -> dict:
         payload = jwt.decode(
             token,
             signing_key.key,
-            algorithms=["RS256", "ES256", settings.JWT_ALGORITHM],
-            options={"verify_aud": False}
+            algorithms=[settings.JWT_ALGORITHM],
+            issuer=settings.JWT_ISSUER,
+            audience=settings.JWT_AUDIENCE,
         )
         return payload
     except jwt.ExpiredSignatureError:

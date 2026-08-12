@@ -102,15 +102,15 @@ The frontend maintains a **Visualization Registry** mapping `type` enums to Reac
 ```
 VISUALIZATION REGISTRY
 │
-├── CPU PIPELINING (MVP Core)
+├── GENERIC RENDERERS (MVP Core)
+│   ├── GENERIC_PROCESS ──► GenericProcessRenderer.tsx
+│   └── CONCEPT_MAP     ──► ConceptMapRenderer.tsx
+│
+├── CPU PIPELINING (Validation/Demo Specialized Renderers)
 │   ├── PIPELINE        ──► PipelineRenderer.tsx
 │   ├── HAZARD          ──► HazardRenderer.tsx
 │   ├── FORWARDING      ──► ForwardingRenderer.tsx
 │   └── STALL           ──► StallRenderer.tsx
-│
-├── GENERIC FALLBACKS (Always Available)
-│   ├── GENERIC_PROCESS ──► GenericProcessRenderer.tsx
-│   └── CONCEPT_MAP     ──► ConceptMapRenderer.tsx
 │
 └── FUTURE EXTENSIBILITY (Post-MVP)
     ├── TREE            ──► TreeRenderer.tsx

@@ -119,8 +119,8 @@ The engine inspects `learner_models.strategyProfile`:
 ```
 
 - **Interest Analogy**: Alters the text/narrative context (e.g. cricket batting partnership).
-- **Visualization Spec**: Shows the **exact, technically accurate CPU Pipelining mechanics** (e.g., instruction stage progress, hazard detection, forwarding path).
-- **Constraint**: The visual renderer NEVER renders fake domain images (e.g., no animated cricket bats); it renders the **actual computer architecture diagram**.
+- **Visualization Spec**: Shows the exact, technically accurate mechanics of the diagnosed concept from the learner's material (for the CPU validation/demo domain: instruction stages, hazards, and forwarding).
+- **Constraint**: The visual renderer NEVER renders fake domain images (e.g., no animated cricket bats); it renders the actual subject concept accurately (for CPU: the computer architecture diagram).
 
 ---
 

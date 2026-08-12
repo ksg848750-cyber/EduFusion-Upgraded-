@@ -35,14 +35,14 @@ async def get_current_user(
     token = parts[1]
     payload = verify_jwt_token(token)
     
-    auth_user_id = payload.get("sub") or payload.get("id") or payload.get("authUserId")
-    email = payload.get("email", "")
-    name = payload.get("name", "Student")
+    auth_user_id = payload.get("sub")
+    email = payload.get("email")
+    name = payload.get("name")
     
-    if not auth_user_id:
+    if not auth_user_id or not email or not name:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"error": {"code": "INVALID_PAYLOAD", "message": "Token payload missing user identifier."}},
+            detail={"error": {"code": "INVALID_PAYLOAD", "message": "Token payload missing required user claims."}},
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -50,7 +50,7 @@ async def get_current_user(
     users_collection = db["users"]
     user_doc = await users_collection.find_one({"authUserId": str(auth_user_id)})
     
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(timezone.utc)
     
     if not user_doc:
         # Auto-provision user record in MongoDB Atlas
@@ -58,15 +58,15 @@ async def get_current_user(
           "authUserId": str(auth_user_id),
           "email": email,
           "name": name,
-          "interests": payload.get("interests", ["technology"]),
+          "interests": payload.get("interests", []),
           "preferences": {
               "language": "en",
               "educationLevel": "undergraduate",
               "studyClass": "btech-3"
           },
-          "isOnboarded": True,
-          "createdAt": now_iso,
-          "updatedAt": now_iso
+          "isOnboarded": False,
+          "createdAt": now,
+          "updatedAt": now
         }
         result = await users_collection.insert_one(new_user)
         new_user["_id"] = str(result.inserted_id)

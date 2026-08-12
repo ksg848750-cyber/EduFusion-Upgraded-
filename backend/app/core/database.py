@@ -13,15 +13,21 @@ class Database:
 db_instance = Database()
 
 
-async def connect_to_mongo():
+async def connect_to_mongo(database_name: str | None = None):
     logger.info("Connecting to MongoDB Atlas...")
-    db_instance.client = AsyncIOMotorClient(settings.MONGODB_URI)
-    db_instance.db = db_instance.client[settings.MONGODB_DB_NAME]
+    db_instance.client = AsyncIOMotorClient(
+        settings.MONGODB_URI,
+        serverSelectionTimeoutMS=5_000,
+    )
+    selected_database = database_name or settings.MONGODB_DB_NAME
+    db_instance.db = db_instance.client[selected_database]
     
     # Ping the database to verify connectivity
     try:
         await db_instance.client.admin.command('ping')
-        logger.info(f"Successfully connected to MongoDB database: {settings.MONGODB_DB_NAME}")
+        await db_instance.db["users"].create_index("authUserId", unique=True)
+        await db_instance.db["users"].create_index("email", unique=True)
+        logger.info(f"Successfully connected to MongoDB database: {selected_database}")
     except Exception as e:
         logger.error(f"Failed to connect to MongoDB: {e}")
         raise e

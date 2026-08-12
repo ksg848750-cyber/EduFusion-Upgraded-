@@ -6,11 +6,11 @@
 
 ## ⚑ Governing Principle — What "MVP" Means For EduFusion
 
-> **MVP = the smallest complete implementation of the actual EduFusion intelligence, restricted to a manageable content scope.**
+> **MVP = the smallest complete implementation of the actual EduFusion intelligence for arbitrary uploaded learning material, validated on a manageable controlled demo scope.**
 > **MVP does NOT mean cutting the intelligence. It means building the complete intended intelligence on a controlled scope.**
 
 ### What we reduce for MVP
-- Number of supported subjects (one: Computer Architecture / CPU Pipelining)
+- Validation/demo domain (Computer Architecture / CPU Pipelining); the core MVP supports arbitrary subjects and uploaded learning material
 - Size of document libraries
 - Number of concurrent users
 - Number of visualization renderers (three: Pipeline, Hazard, Forwarding)
