@@ -11,7 +11,7 @@ Its core loop is:
 ASSESS → DIAGNOSE → FIND WHY → DECIDE WHAT → DECIDE HOW
 → EXPLAIN + VISUALIZE → REASSESS → UPDATE LEARNER MODEL → REPEAT
 
-The MVP implements the complete intelligence loop on a controlled **Computer Architecture / CPU Pipelining** scope.
+The MVP implements the complete intelligence loop for **arbitrary subjects and uploaded learning material**. Computer Architecture / CPU Pipelining is a controlled validation/demo domain and source of specialized visualization renderers, not a limit on core subject support.
 
 ---
 

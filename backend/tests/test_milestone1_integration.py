@@ -1,4 +1,5 @@
 import pytest
+import pytest_asyncio
 import jwt
 from datetime import datetime, timezone, timedelta
 from httpx import AsyncClient, ASGITransport
@@ -6,28 +7,42 @@ from app.main import app
 from app.core.config import settings
 from app.core.database import connect_to_mongo, close_mongo_connection, db_instance
 
+from unittest.mock import patch
+from fastapi import HTTPException, status
 
-def create_test_jwt(auth_user_id: str, email: str, name: str, expires_in_minutes: int = 60) -> str:
-    payload = {
-        "sub": auth_user_id,
-        "email": email,
-        "name": name,
-        "interests": ["cricket", "gaming"],
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=expires_in_minutes)
-    }
-    return jwt.encode(payload, settings.BETTER_AUTH_SECRET, algorithm=settings.JWT_ALGORITHM)
-
-
-def create_expired_jwt(auth_user_id: str) -> str:
-    payload = {
-        "sub": auth_user_id,
-        "email": "expired@example.com",
-        "exp": datetime.now(timezone.utc) - timedelta(minutes=10)
-    }
-    return jwt.encode(payload, settings.BETTER_AUTH_SECRET, algorithm=settings.JWT_ALGORITHM)
-
+def mock_verify_jwt_token(token: str) -> dict:
+    if token == "mock_valid_token_ganesh":
+        return {
+            "sub": "auth_ganesh_001",
+            "email": "ganesh@example.com",
+            "name": "Ganesh",
+            "interests": ["cricket", "gaming"]
+        }
+    elif token == "mock_expired_token":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": {"code": "TOKEN_EXPIRED", "message": "Authentication token has expired."}},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    elif token == "invalid_garbage_token":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": {"code": "INVALID_TOKEN", "message": "Invalid authentication token."}},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail={"error": {"code": "INVALID_TOKEN", "message": "Invalid authentication token."}},
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 @pytest.fixture(autouse=True)
+def patch_verify_jwt():
+    with patch("app.core.middleware.verify_jwt_token", side_effect=mock_verify_jwt_token):
+        yield
+
+
+@pytest_asyncio.fixture(autouse=True)
 async def setup_db():
     await connect_to_mongo()
     # Clean test database collections
@@ -67,9 +82,8 @@ async def test_invalid_token_returns_401():
 
 @pytest.mark.asyncio
 async def test_expired_token_returns_401():
-    expired_token = create_expired_jwt("user_expired_123")
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        res = await ac.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {expired_token}"})
+        res = await ac.get("/api/v1/auth/me", headers={"Authorization": "Bearer mock_expired_token"})
         assert res.status_code == 401
         data = res.json()
         assert "error" in data
@@ -78,8 +92,7 @@ async def test_expired_token_returns_401():
 
 @pytest.mark.asyncio
 async def test_valid_token_provisions_user_and_creates_subject():
-    token = create_test_jwt("auth_ganesh_001", "ganesh@example.com", "Ganesh")
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = {"Authorization": "Bearer mock_valid_token_ganesh"}
 
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         # 1. Fetch user profile - auto provisions in MongoDB

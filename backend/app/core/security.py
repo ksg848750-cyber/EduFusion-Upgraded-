@@ -6,31 +6,23 @@ from app.core.config import settings
 
 logger = logging.getLogger("edufusion.security")
 
-jwk_client = PyJWKClient(settings.JWKS_URL) if settings.JWKS_URL else None
+jwk_client = PyJWKClient(settings.JWKS_URL)
 
 
 def verify_jwt_token(token: str) -> dict:
     """
     Verifies a JWT token issued by Better Auth / Auth system.
-    Supports JWKS endpoint verification (RS256) or fallback secret verification (HS256).
+    Strictly uses JWKS endpoint verification (RS256).
     Returns the decoded token payload if valid, or raises HTTPException 401.
     """
     try:
-        if settings.JWKS_URL and jwk_client:
-            signing_key = jwk_client.get_signing_key_from_jwt(token)
-            payload = jwt.decode(
-                token,
-                signing_key.key,
-                algorithms=["RS256", "ES256", settings.JWT_ALGORITHM],
-                options={"verify_aud": False}
-            )
-        else:
-            payload = jwt.decode(
-                token,
-                settings.BETTER_AUTH_SECRET,
-                algorithms=[settings.JWT_ALGORITHM],
-                options={"verify_aud": False}
-            )
+        signing_key = jwk_client.get_signing_key_from_jwt(token)
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256", "ES256", settings.JWT_ALGORITHM],
+            options={"verify_aud": False}
+        )
         return payload
     except jwt.ExpiredSignatureError:
         logger.warning("Token signature has expired.")

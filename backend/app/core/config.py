@@ -8,9 +8,8 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     
     # Security / Auth
-    BETTER_AUTH_SECRET: str = "edufusion_dev_secret_key_change_in_production_32bytes"
-    JWT_ALGORITHM: str = "HS256"
-    JWKS_URL: str | None = None  # Configurable if using external JWKS endpoint
+    JWT_ALGORITHM: str = "RS256"
+    JWKS_URL: str  # Required from env
     
     # MongoDB Atlas
     MONGODB_URI: str = "mongodb://localhost:27017"  # Default fallback, overridden by env
