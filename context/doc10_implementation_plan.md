@@ -26,14 +26,14 @@
 ```
 MILESTONE 1: FOUNDATION & AUTH
   ├─ Git repo & directory structure (`frontend/` & `backend/`)
-  ├─ Better Auth setup + JWT issuance
-  ├─ FastAPI server + JWKS token validation middleware
-  └─ MongoDB Atlas connection + `users` collection setup
+  ├─ Supabase Auth setup + JWT issuance
+  ├─ FastAPI server + Supabase-JWT (JWKS) verification middleware
+  └─ Supabase PostgreSQL connection + `users` / `profiles` table setup
 
 MILESTONE 2: KNOWLEDGE INGESTION & GRAPH
   ├─ PDF extraction (PyMuPDF / pypdf) with page retention
   ├─ Structural cleaning & semantic document chunking
-  ├─ MongoDB Vector Search index setup
+  ├─ pgvector Vector Search index setup (Supabase PostgreSQL)
   ├─ LLM Concept & Relationship Extraction (Pydantic validated)
   ├─ Deterministic Graph Validator (Cycle & edge checking)
   └─ Knowledge Graph UI Map (Stitch checkpoint #1)
@@ -124,7 +124,7 @@ A automated integration test executing the complete 13-step sequence from PDF up
 A vertical slice is marked **DONE** only when:
 - [x] Python/FastAPI business logic functions pass unit tests.
 - [x] Pydantic schemas validate all incoming/outgoing payloads.
-- [x] MongoDB database documents persist correctly.
+- [x] Supabase PostgreSQL tables persist records correctly.
 - [x] Next.js UI component renders the feature cleanly.
 - [x] Authorization checks prevent cross-user data leaks (`403`).
 - [x] Application error envelopes handle AI failure edge cases cleanly.
@@ -137,13 +137,13 @@ All 10 fundamental design documents are complete, aligned, and locked:
 
 | Doc # | Document Title | Status |
 |---|---|---|
-| **Doc 1** | Data Architecture (Schemas, Indexes, Collections) | ✅ LOCKED |
+| **Doc 1** | Data Architecture (Schemas, Indexes, Tables) | ✅ LOCKED |
 | **Doc 2** | LLM Knowledge Extraction Architecture (PDF $\rightarrow$ Graph) | ✅ LOCKED |
 | **Doc 3** | Diagnostic Intelligence Architecture (Reasoning $\rightarrow$ Root Cause) | ✅ LOCKED |
 | **Doc 4** | Adaptive Teaching Engine Architecture (WHAT & HOW Decisions) | ✅ LOCKED |
 | **Doc 5** | Visualization Engine Architecture (Declarative Specs & Renderers) | ✅ LOCKED |
 | **Doc 6** | Reassessment & Learner Model Architecture (Verification & Memory) | ✅ LOCKED |
-| **Doc 7** | API Specification & Flow Architecture (FastAPI & Better Auth Contracts) | ✅ LOCKED |
+| **Doc 7** | API Specification & Flow Architecture (FastAPI & Supabase Auth Contracts) | ✅ LOCKED |
 | **Doc 8** | UX / Screen & Interaction Specification (Stitch MCP Design System) | ✅ LOCKED |
 | **Doc 9** | Technology Architecture & Learning Guide (Stack & Defense Q&A) | ✅ LOCKED |
 | **Doc 10** | Implementation Plan (Milestones, Slices, & Demo Sequence) | ✅ LOCKED |

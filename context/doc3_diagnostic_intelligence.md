@@ -85,10 +85,10 @@ When initial answer analysis yields an ambiguous signal (e.g. equal likelihood o
 
 ## Data Model Updates for Probes & Evidence
 
-### 1. `diagnostic_sessions` Collection (Updated)
+### 1. `diagnostic_sessions` Table (Updated)
 ```json
 {
-  "_id": "session_001",
+  "id": "session_001",
   "userId": "usr_001",
   "subjectId": "subj_001",
   "status": "IN_PROGRESS",
@@ -117,10 +117,10 @@ When initial answer analysis yields an ambiguous signal (e.g. equal likelihood o
 }
 ```
 
-### 2. `questions` Collection (Updated for Probes)
+### 2. `questions` Table (Updated for Probes)
 ```json
 {
-  "_id": "q_probe_001",
+  "id": "q_probe_001",
   "subjectId": "subj_001",
   "conceptIds": ["con_005"],
   "questionType": "PROBE",
@@ -139,10 +139,10 @@ When initial answer analysis yields an ambiguous signal (e.g. equal likelihood o
 }
 ```
 
-### 3. `diagnoses` Collection (Updated Evidence Bundle)
+### 3. `diagnoses` Table (Updated Evidence Bundle)
 ```json
 {
-  "_id": "diag_001",
+  "id": "diag_001",
   "userId": "usr_001",
   "subjectId": "subj_001",
   "sessionId": "session_001",
@@ -220,7 +220,7 @@ Submits student response & reasoning for the probe question.
 │  - Checks Knowledge Graph prerequisites   │
 │  - Combines initial + probe evidence      │
 │  - Computes final confidence score        │
-│  - Persists diagnosis to MongoDB          │
+│  - Persists diagnosis to Supabase PostgreSQL          │
 └───────────────────────────────────────────┘
 ```
 

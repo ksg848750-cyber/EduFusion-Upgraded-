@@ -37,7 +37,7 @@
       Embedding Generator               LLM Concept Extractor
                │                                 │
                ▼                                 ▼
-    MongoDB Atlas Vector Index         Candidate Concepts
+pgvector Vector Index (Supabase)      Candidate Concepts
                                                  │
                                                  ▼
                                        Concept Normalization
@@ -50,7 +50,7 @@
                                      (Cycle & Edge Checking)
                                                  │
                                                  ▼
-                                        MongoDB Graph Storage
+                                    Supabase PostgreSQL Graph Storage
 ```
 
 ---
@@ -64,7 +64,7 @@
   - Raw text per page.
   - Page boundaries (`pageNumber`).
   - Section headings (`headingPath` e.g., `["3.0 Pipelining", "3.4 Pipeline Hazards"]`).
-- **Output Record**: `materials` document (`processingStatus = PROCESSING`).
+- **Output Record**: `materials` table row (`processingStatus = PROCESSING`).
 
 ### Stage 2: Structural Text Cleaning
 Normalized without altering pedagogical meaning.
@@ -83,8 +83,8 @@ Rather than arbitrary character/token splits, chunks preserve semantic completen
 
 #### Path A: Vector Memory (RAG Foundation)
 1. **Embedding Generation**: Text chunks sent to embedding model (model & dimensions TBD in Implementation Phase).
-2. **Database Record**: Written to `document_chunks` collection with `embedding` float vector.
-3. **Index**: Indexed in MongoDB Atlas Vector Search for semantic similarity queries during lesson generation.
+2. **Database Record**: Written to `document_chunks` table with `embedding` float vector.
+3. **Index**: Indexed via pgvector in Supabase PostgreSQL for semantic similarity queries during lesson generation.
 
 #### Path B: Knowledge Graph Extraction
 
@@ -101,7 +101,7 @@ Chunk + Heading Context ──► LLM Concept Extractor ──► Candidate Conc
                                                 Deterministic Graph Validator
                                                            │
                                                            ▼
-                                                 MongoDB concepts &
+                                                 Supabase PostgreSQL concepts &
                                                  concept_relationships
 ```
 
@@ -157,7 +157,7 @@ To prevent duplicate nodes (`"Data Hazard"`, `"Data hazards"`, `"data_hazard"`):
 2. **Deduplication Logic**:
    - Query `concepts` where `subjectId = currentSubjectId` AND `canonicalName = candidateCanonicalName`.
    - **If exists**: Merge `sourceReferences` and append new `commonMisconceptions`.
-   - **If new**: Insert new document into `concepts`.
+   - **If new**: Insert new row into `concepts`.
 
 ---
 
@@ -204,7 +204,7 @@ Before writing edges to `concept_relationships`:
 │  - Duplicate concept merging            │
 │  - Graph cycle detection (DFS)          │
 │  - Source chunk mapping & provenance    │
-│  - MongoDB database writes              │
+│  - Supabase PostgreSQL database writes  │
 └─────────────────────────────────────────┘
 ```
 
@@ -217,8 +217,8 @@ Every extracted concept and relationship carries explicit `sourceReferences`:
 ```json
 "sourceReferences": [
   {
-    "materialId": "ObjectId('66b9...')",
-    "chunkId": "ObjectId('66b9...')",
+    "materialId": "uuid('66b9...')",
+    "chunkId": "uuid('66b9...')",
     "pageNumber": 14
   }
 ]
@@ -232,10 +232,10 @@ If EduFusion presents a lesson or diagnosis, it can trace back to the exact chun
 ## Validation/Demo Example: CPU Pipelining
 
 1. Student uploads `Computer_Architecture_Notes.pdf`.
-2. Backend parses 84 pages into 312 semantic chunks and stores embeddings in MongoDB Atlas Vector Search.
+2. Backend parses 84 pages into 312 semantic chunks and stores embeddings via pgvector in Supabase PostgreSQL.
 3. LLM extracts 37 concepts and canonicalizes them (e.g. `instruction_cycle`, `pipeline_stages`, `data_hazard`, `forwarding`, `stalling`).
 4. LLM proposes relationships; Backend graph validator checks for cycles and validates prerequisites.
-5. MongoDB stores the validated Knowledge Graph.
+5. Supabase PostgreSQL stores the validated Knowledge Graph.
 6. **Result**: The system is ready for diagnostic assessment without hardcoded knowledge nodes.
 
 ---

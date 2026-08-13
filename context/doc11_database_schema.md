@@ -5,40 +5,40 @@
 
 ## Probe-Enabled Schemas
 
-### 1. `diagnostic_sessions` Collection (Updated)
+### 1. `diagnostic_sessions` Table (Updated)
 ```json
 {
-  "_id": "ObjectId",
-  "userId": "ObjectId (REQUIRED, Ref -> users)",
-  "subjectId": "ObjectId (REQUIRED, Ref -> subjects)",
-  "targetConceptIds": ["ObjectId (Ref -> concepts)"],
-  "questionIds": ["ObjectId (Ref -> questions)"],
-  "answerIds": ["ObjectId (Ref -> diagnostic_answers)"],
+  "id": "uuid (PRIMARY KEY)",
+  "userId": "uuid (REQUIRED, FK -> users)",
+  "subjectId": "uuid (REQUIRED, FK -> subjects)",
+  "targetConceptIds": ["uuid (FK -> concepts)"],
+  "questionIds": ["uuid (FK -> questions)"],
+  "answerIds": ["uuid (FK -> diagnostic_answers)"],
   "status": "Enum [CREATED, IN_PROGRESS, PROBE_REQUIRED, COMPLETED, ABANDONED] (REQUIRED)",
   "investigationState": {
     "isUnderInvestigation": "Boolean",
     "candidateHypotheses": [
       {
         "category": "Enum [MISSING_PREREQUISITE, MISCONCEPTION, etc.]",
-        "targetConceptId": "ObjectId",
+        "targetConceptId": "uuid",
         "likelihood": "Float"
       }
     ],
-    "probeQuestionIds": ["ObjectId (Ref -> questions)"],
-    "probeAnswerIds": ["ObjectId (Ref -> diagnostic_answers)"]
+    "probeQuestionIds": ["uuid (FK -> questions)"],
+    "probeAnswerIds": ["uuid (FK -> diagnostic_answers)"]
   },
-  "diagnosisId": "ObjectId (OPTIONAL, Ref -> diagnoses)",
+  "diagnosisId": "uuid (OPTIONAL, FK -> diagnoses)",
   "startedAt": "Date (REQUIRED)",
   "completedAt": "Date (OPTIONAL)"
 }
 ```
 
-### 2. `diagnostic_questions` Collection (Updated)
+### 2. `diagnostic_questions` Table (Updated)
 ```json
 {
-  "_id": "ObjectId",
-  "subjectId": "ObjectId (REQUIRED, Ref -> subjects)",
-  "conceptId": "ObjectId (REQUIRED, Ref -> concepts)",
+  "id": "uuid (PRIMARY KEY)",
+  "subjectId": "uuid (REQUIRED, FK -> subjects)",
+  "conceptId": "uuid (REQUIRED, FK -> concepts)",
   "questionType": "Enum [SCENARIO, SHORT_ANSWER, MCQ, PROBE] (REQUIRED)",
   "difficulty": "Number (1-5)",
   "question": "String (REQUIRED)",
@@ -49,35 +49,35 @@
     "hypothesisA": "String",
     "hypothesisB": "String"
   },
-  "parentQuestionId": "ObjectId (OPTIONAL, Ref -> diagnostic_questions)",
-  "sourceChunkIds": ["ObjectId (Ref -> document_chunks)"],
+  "parentQuestionId": "uuid (OPTIONAL, FK -> diagnostic_questions)",
+  "sourceChunkIds": ["uuid (FK -> document_chunks)"],
   "createdAt": "Date (REQUIRED)"
 }
 ```
 
-### 3. `diagnoses` Collection (Updated)
+### 3. `diagnoses` Table (Updated)
 ```json
 {
-  "_id": "ObjectId",
-  "userId": "ObjectId (REQUIRED, Ref -> users)",
-  "subjectId": "ObjectId (REQUIRED, Ref -> subjects)",
-  "sessionId": "ObjectId (REQUIRED, Ref -> diagnostic_sessions)",
-  "conceptId": "ObjectId (REQUIRED, Ref -> concepts)",
+  "id": "uuid (PRIMARY KEY)",
+  "userId": "uuid (REQUIRED, FK -> users)",
+  "subjectId": "uuid (REQUIRED, FK -> subjects)",
+  "sessionId": "uuid (REQUIRED, FK -> diagnostic_sessions)",
+  "conceptId": "uuid (REQUIRED, FK -> concepts)",
   "rootCause": "Enum [MISSING_PREREQUISITE, CONCEPTUAL_MISUNDERSTANDING, PROCEDURAL_ERROR, REPRESENTATION_PROBLEM, TERMINOLOGY_CONFUSION, INSUFFICIENT_EVIDENCE] (REQUIRED)",
-  "prerequisiteConceptId": "ObjectId (OPTIONAL, Ref -> concepts)",
+  "prerequisiteConceptId": "uuid (OPTIONAL, FK -> concepts)",
   "confidence": "Float (0.0-1.0, REQUIRED)",
   "explanation": "String (REQUIRED)",
   "investigationHistory": {
-    "initialFailureQuestionId": "ObjectId",
+    "initialFailureQuestionId": "uuid",
     "initialSignals": ["String"],
     "probeExecuted": "Boolean",
-    "probeQuestionId": "ObjectId",
+    "probeQuestionId": "uuid",
     "probeSignal": "String"
   },
   "evidence": [
     {
-      "questionId": "ObjectId",
-      "answerId": "ObjectId",
+      "questionId": "uuid",
+      "answerId": "uuid",
       "reason": "String"
     }
   ],

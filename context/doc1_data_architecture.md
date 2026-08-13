@@ -5,7 +5,7 @@
 
 ## Governing Principle
 
-> MongoDB is EduFusion's long-term memory.
+> Supabase PostgreSQL is EduFusion's long-term memory.
 > We separate **Subject Knowledge** (what is true in the material) from **Learner Knowledge** (what THIS student understands).
 > Every piece of intelligence the system produces is stored, retrievable, and explainable.
 
@@ -38,20 +38,20 @@
 
 ## Global Database Rules
 
-1. **IDs**: Use native `ObjectId` for `_id` and all foreign key references (`userId`, `subjectId`, `conceptId`, etc.).
+1. **IDs**: Use PostgreSQL `uuid` primary keys for `id` and all foreign key references (`userId`, `subjectId`, `conceptId`, etc.).
 2. **Timestamps**: All persistent entities get `createdAt` and `updatedAt` in UTC ISO 8601. Immutable event records use `timestamp` or `createdAt`.
-3. **Identity Boundary**: `authUserId` (from Better Auth) is verified on every request by FastAPI. Frontends cannot supply arbitrary user IDs.
+3. **Identity Boundary**: Supabase-issued `authUserId` is verified by FastAPI against Supabase's JWKS / public keys on every request. Frontends cannot supply arbitrary user IDs.
 4. **Current vs History**: `learner_models.conceptStates` holds current mastery for fast reads; historical evidence lives in `answers`, `diagnoses`, `reassessments`, and `learning_events`.
 
 ---
 
-## Detailed Collection Specifications
+## Detailed Table Specifications
 
 ### 1. `users`
-App-level profile linked to Better Auth identity.
+App-level profile linked to a Supabase Auth identity.
 ```json
 {
-  "_id": "ObjectId",
+  "id": "uuid (PRIMARY KEY)",
   "authUserId": "String (REQUIRED, UNIQUE)",
   "name": "String (REQUIRED)",
   "email": "String (REQUIRED, UNIQUE)",
@@ -74,8 +74,8 @@ App-level profile linked to Better Auth identity.
 Learning subjects/courses owned by a user.
 ```json
 {
-  "_id": "ObjectId",
-  "ownerId": "ObjectId (REQUIRED, Ref -> users)",
+  "id": "uuid (PRIMARY KEY)",
+  "ownerId": "uuid (REQUIRED, FK -> users)",
   "name": "String (REQUIRED)",
   "description": "String (OPTIONAL)",
   "status": "Enum [ACTIVE, ARCHIVED] (REQUIRED)",
@@ -92,9 +92,9 @@ Learning subjects/courses owned by a user.
 Source documents uploaded for a subject.
 ```json
 {
-  "_id": "ObjectId",
-  "subjectId": "ObjectId (REQUIRED, Ref -> subjects)",
-  "ownerId": "ObjectId (REQUIRED, Ref -> users)",
+  "id": "uuid (PRIMARY KEY)",
+  "subjectId": "uuid (REQUIRED, FK -> subjects)",
+  "ownerId": "uuid (REQUIRED, FK -> users)",
   "filename": "String (REQUIRED)",
   "fileType": "Enum [PDF, DOCX, PPTX, TXT, IMAGE] (REQUIRED)",
   "storageReference": "String (REQUIRED)",
@@ -113,9 +113,9 @@ Source documents uploaded for a subject.
 Primary RAG retrieval units with vector embeddings.
 ```json
 {
-  "_id": "ObjectId",
-  "materialId": "ObjectId (REQUIRED, Ref -> materials)",
-  "subjectId": "ObjectId (REQUIRED, Ref -> subjects)",
+  "id": "uuid (PRIMARY KEY)",
+  "materialId": "uuid (REQUIRED, FK -> materials)",
+  "subjectId": "uuid (REQUIRED, FK -> subjects)",
   "chunkIndex": "Number (REQUIRED)",
   "text": "String (REQUIRED)",
   "pageNumber": "Number (OPTIONAL)",
@@ -127,7 +127,7 @@ Primary RAG retrieval units with vector embeddings.
   "createdAt": "Date (REQUIRED)"
 }
 ```
-**Indexes**: Vector Index on `embedding`, `(materialId, chunkIndex)`, `subjectId`
+**Indexes**: pgvector (HNSW) index on `embedding`, `(materialId, chunkIndex)`, `subjectId`
 
 ---
 
@@ -135,16 +135,16 @@ Primary RAG retrieval units with vector embeddings.
 Nodes of the Knowledge Graph extracted from materials.
 ```json
 {
-  "_id": "ObjectId",
-  "subjectId": "ObjectId (REQUIRED, Ref -> subjects)",
+  "id": "uuid (PRIMARY KEY)",
+  "subjectId": "uuid (REQUIRED, FK -> subjects)",
   "name": "String (REQUIRED)",
   "canonicalName": "String (REQUIRED - e.g., 'data_hazard')",
   "description": "String (REQUIRED)",
   "difficulty": "Number (1-5)",
   "sourceReferences": [
     {
-      "materialId": "ObjectId",
-      "chunkId": "ObjectId",
+      "materialId": "uuid",
+      "chunkId": "uuid",
       "pageNumber": 14
     }
   ],
@@ -166,16 +166,16 @@ Nodes of the Knowledge Graph extracted from materials.
 Directed edges of the Knowledge Graph.
 ```json
 {
-  "_id": "ObjectId",
-  "subjectId": "ObjectId (REQUIRED, Ref -> subjects)",
-  "fromConceptId": "ObjectId (REQUIRED, Ref -> concepts)",
-  "toConceptId": "ObjectId (REQUIRED, Ref -> concepts)",
+  "id": "uuid (PRIMARY KEY)",
+  "subjectId": "uuid (REQUIRED, FK -> subjects)",
+  "fromConceptId": "uuid (REQUIRED, FK -> concepts)",
+  "toConceptId": "uuid (REQUIRED, FK -> concepts)",
   "relationshipType": "Enum [PREREQUISITE, DEPENDS_ON, PART_OF, RELATED_TO, CONTRASTS_WITH] (REQUIRED)",
   "confidence": "Float (0.0-1.0, REQUIRED)",
   "sourceReferences": [
     {
-      "materialId": "ObjectId",
-      "chunkId": "ObjectId",
+      "materialId": "uuid",
+      "chunkId": "uuid",
       "pageNumber": 14
     }
   ],
@@ -196,12 +196,12 @@ Directed edges of the Knowledge Graph.
 Central intelligence state for a student on a subject.
 ```json
 {
-  "_id": "ObjectId",
-  "userId": "ObjectId (REQUIRED, Ref -> users)",
-  "subjectId": "ObjectId (REQUIRED, Ref -> subjects)",
+  "id": "uuid (PRIMARY KEY)",
+  "userId": "uuid (REQUIRED, FK -> users)",
+  "subjectId": "uuid (REQUIRED, FK -> subjects)",
   "conceptStates": [
     {
-      "conceptId": "ObjectId",
+      "conceptId": "uuid",
       "mastery": 0.34,
       "status": "Enum [UNKNOWN, WEAK, DEVELOPING, MASTERED]",
       "confidence": 0.81,
@@ -209,11 +209,11 @@ Central intelligence state for a student on a subject.
       "lastAssessedAt": "Date"
     }
   ],
-  "activeMisconceptionIds": ["ObjectId (Ref -> misconceptions)"],
+  "activeMisconceptionIds": ["uuid (FK -> misconceptions)"],
   "prerequisiteGaps": [
     {
-      "conceptId": "ObjectId",
-      "missingPrereqId": "ObjectId"
+      "conceptId": "uuid",
+      "missingPrereqId": "uuid"
     }
   ],
   "strategyProfile": {
@@ -236,17 +236,17 @@ Central intelligence state for a student on a subject.
 Persistent mental-model distortions identified for a learner.
 ```json
 {
-  "_id": "ObjectId",
-  "learnerId": "ObjectId (REQUIRED, Ref -> users)",
-  "subjectId": "ObjectId (REQUIRED, Ref -> subjects)",
-  "conceptId": "ObjectId (REQUIRED, Ref -> concepts)",
+  "id": "uuid (PRIMARY KEY)",
+  "learnerId": "uuid (REQUIRED, FK -> users)",
+  "subjectId": "uuid (REQUIRED, FK -> subjects)",
+  "conceptId": "uuid (REQUIRED, FK -> concepts)",
   "category": "Enum [MISSING_PREREQUISITE, MISCONCEPTION, PROCEDURAL_ERROR, TERMINOLOGY_CONFUSION, REPRESENTATION_PROBLEM, INSUFFICIENT_EVIDENCE] (REQUIRED)",
   "statement": "String (REQUIRED)",
   "confidence": "Float (0.0-1.0, REQUIRED)",
   "evidenceReferences": [
     {
-      "questionId": "ObjectId",
-      "answerId": "ObjectId",
+      "questionId": "uuid",
+      "answerId": "uuid",
       "signal": "student_treats_pipeline_stages_as_independent"
     }
   ],
@@ -265,11 +265,11 @@ Persistent mental-model distortions identified for a learner.
 Assessment session orchestrating diagnostic questions.
 ```json
 {
-  "_id": "ObjectId",
-  "learnerId": "ObjectId (REQUIRED, Ref -> users)",
-  "subjectId": "ObjectId (REQUIRED, Ref -> subjects)",
-  "conceptScope": ["ObjectId (Ref -> concepts)"],
-  "questionIds": ["ObjectId (Ref -> questions)"],
+  "id": "uuid (PRIMARY KEY)",
+  "learnerId": "uuid (REQUIRED, FK -> users)",
+  "subjectId": "uuid (REQUIRED, FK -> subjects)",
+  "conceptScope": ["uuid (FK -> concepts)"],
+  "questionIds": ["uuid (FK -> questions)"],
   "status": "Enum [CREATED, IN_PROGRESS, COMPLETED, ABANDONED] (REQUIRED)",
   "startedAt": "Date (REQUIRED)",
   "completedAt": "Date (OPTIONAL)"
@@ -283,9 +283,9 @@ Assessment session orchestrating diagnostic questions.
 Questions created specifically for diagnostic mental-model discovery or reassessment.
 ```json
 {
-  "_id": "ObjectId",
-  "subjectId": "ObjectId (REQUIRED, Ref -> subjects)",
-  "conceptIds": ["ObjectId (Ref -> concepts)"],
+  "id": "uuid (PRIMARY KEY)",
+  "subjectId": "uuid (REQUIRED, FK -> subjects)",
+  "conceptIds": ["uuid (FK -> concepts)"],
   "questionType": "Enum [MCQ, SHORT_ANSWER, SCENARIO, DIAGNOSTIC, REASSESSMENT, PROBE] (REQUIRED)",
   "difficulty": "Number (1-5)",
   "questionText": "String (REQUIRED)",
@@ -293,7 +293,7 @@ Questions created specifically for diagnostic mental-model discovery or reassess
   "expectedReasoning": "String (REQUIRED)",
   "diagnosticTargets": ["String (REQUIRED - e.g. 'UNDERSTANDS_DATA_DEPENDENCY')"],
   "sourceReferences": [
-    { "materialId": "ObjectId", "chunkId": "ObjectId" }
+    { "materialId": "uuid", "chunkId": "uuid" }
   ],
   "generationMetadata": "Object",
   "createdAt": "Date (REQUIRED)"
@@ -307,11 +307,11 @@ Questions created specifically for diagnostic mental-model discovery or reassess
 Student responses containing reasoning for diagnostic analysis.
 ```json
 {
-  "_id": "ObjectId",
-  "questionId": "ObjectId (REQUIRED, Ref -> questions)",
-  "learnerId": "ObjectId (REQUIRED, Ref -> users)",
-  "diagnosticSessionId": "ObjectId (OPTIONAL, Ref -> diagnostic_sessions)",
-  "reassessmentId": "ObjectId (OPTIONAL, Ref -> reassessments)",
+  "id": "uuid (PRIMARY KEY)",
+  "questionId": "uuid (REQUIRED, FK -> questions)",
+  "learnerId": "uuid (REQUIRED, FK -> users)",
+  "diagnosticSessionId": "uuid (OPTIONAL, FK -> diagnostic_sessions)",
+  "reassessmentId": "uuid (OPTIONAL, FK -> reassessments)",
   "response": "String (REQUIRED)",
   "reasoning": "String (OPTIONAL)",
   "correctness": "Boolean (REQUIRED)",
@@ -332,22 +332,22 @@ Student responses containing reasoning for diagnostic analysis.
 Results of diagnostic reasoning over a session's evidence.
 ```json
 {
-  "_id": "ObjectId",
-  "learnerId": "ObjectId (REQUIRED, Ref -> users)",
-  "subjectId": "ObjectId (REQUIRED, Ref -> subjects)",
-  "sessionId": "ObjectId (REQUIRED, Ref -> diagnostic_sessions)",
-  "conceptId": "ObjectId (REQUIRED, Ref -> concepts)",
+  "id": "uuid (PRIMARY KEY)",
+  "learnerId": "uuid (REQUIRED, FK -> users)",
+  "subjectId": "uuid (REQUIRED, FK -> subjects)",
+  "sessionId": "uuid (REQUIRED, FK -> diagnostic_sessions)",
+  "conceptId": "uuid (REQUIRED, FK -> concepts)",
   "rootCause": "Enum [MISSING_PREREQUISITE, MISCONCEPTION, PROCEDURAL_ERROR, TERMINOLOGY_CONFUSION, REPRESENTATION_PROBLEM, INSUFFICIENT_EVIDENCE] (REQUIRED)",
   "confidence": "Float (0.0-1.0, REQUIRED)",
   "explanation": "String (REQUIRED)",
   "evidenceReferences": [
     {
-      "questionId": "ObjectId",
-      "answerId": "ObjectId",
+      "questionId": "uuid",
+      "answerId": "uuid",
       "signal": "String"
     }
   ],
-  "prerequisiteConceptId": "ObjectId (OPTIONAL, Ref -> concepts)",
+  "prerequisiteConceptId": "uuid (OPTIONAL, FK -> concepts)",
   "recommendedAction": "Enum [REPAIR_PREREQUISITE, CORRECT_MISCONCEPTION, PRACTICE_PROCEDURE, CLARIFY_TERMINOLOGY, CHANGE_REPRESENTATION, REQUEST_MORE_EVIDENCE] (REQUIRED)",
   "modelMetadata": "Object",
   "createdAt": "Date (REQUIRED)"
@@ -361,11 +361,11 @@ Results of diagnostic reasoning over a session's evidence.
 Instructional content & structured visualization specifications delivered to the learner.
 ```json
 {
-  "_id": "ObjectId",
-  "learnerId": "ObjectId (REQUIRED, Ref -> users)",
-  "subjectId": "ObjectId (REQUIRED, Ref -> subjects)",
-  "diagnosisId": "ObjectId (REQUIRED, Ref -> diagnoses)",
-  "targetConceptId": "ObjectId (REQUIRED, Ref -> concepts)",
+  "id": "uuid (PRIMARY KEY)",
+  "learnerId": "uuid (REQUIRED, FK -> users)",
+  "subjectId": "uuid (REQUIRED, FK -> subjects)",
+  "diagnosisId": "uuid (REQUIRED, FK -> diagnoses)",
+  "targetConceptId": "uuid (REQUIRED, FK -> concepts)",
   "strategy": "Enum [DIRECT_EXPLANATION, STEP_BY_STEP, WORKED_EXAMPLE, VISUAL_EXPLANATION, INTEREST_CONTEXT, INTERACTIVE_EXPLANATION, PREREQUISITE_REPAIR] (REQUIRED)",
   "explanation": "String (REQUIRED)",
   "interestContext": {
@@ -380,7 +380,7 @@ Instructional content & structured visualization specifications delivered to the
     "animation": { "steps": [] }
   },
   "sourceReferences": [
-    { "materialId": "ObjectId", "chunkId": "ObjectId" }
+    { "materialId": "uuid", "chunkId": "uuid" }
   ],
   "status": "Enum [GENERATED, DELIVERED, COMPLETED] (REQUIRED)",
   "createdAt": "Date (REQUIRED)"
@@ -394,16 +394,16 @@ Instructional content & structured visualization specifications delivered to the
 Targeted evaluation verifying whether an intervention corrected the diagnosed gap.
 ```json
 {
-  "_id": "ObjectId",
-  "learnerId": "ObjectId (REQUIRED, Ref -> users)",
-  "originalDiagnosisId": "ObjectId (REQUIRED, Ref -> diagnoses)",
-  "targetConceptId": "ObjectId (REQUIRED, Ref -> concepts)",
+  "id": "uuid (PRIMARY KEY)",
+  "learnerId": "uuid (REQUIRED, FK -> users)",
+  "originalDiagnosisId": "uuid (REQUIRED, FK -> diagnoses)",
+  "targetConceptId": "uuid (REQUIRED, FK -> concepts)",
   "targetGap": {
     "description": "String",
     "category": "String"
   },
-  "questionId": "ObjectId (REQUIRED, Ref -> questions)",
-  "answerId": "ObjectId (REQUIRED, Ref -> answers)",
+  "questionId": "uuid (REQUIRED, FK -> questions)",
+  "answerId": "uuid (REQUIRED, FK -> answers)",
   "result": "Enum [PASSED, FAILED, INCONCLUSIVE] (REQUIRED)",
   "masteryBefore": "Float (REQUIRED)",
   "masteryAfter": "Float (REQUIRED)",
@@ -418,12 +418,12 @@ Targeted evaluation verifying whether an intervention corrected the diagnosed ga
 Immutable historical timeline recording every event in the system.
 ```json
 {
-  "_id": "ObjectId",
-  "learnerId": "ObjectId (REQUIRED, Ref -> users)",
-  "subjectId": "ObjectId (OPTIONAL, Ref -> subjects)",
+  "id": "uuid (PRIMARY KEY)",
+  "learnerId": "uuid (REQUIRED, FK -> users)",
+  "subjectId": "uuid (OPTIONAL, FK -> subjects)",
   "eventType": "Enum [MATERIAL_UPLOADED, MATERIAL_PROCESSED, DIAGNOSTIC_STARTED, QUESTION_ANSWERED, DIAGNOSIS_CREATED, MISCONCEPTION_DETECTED, MISCONCEPTION_RESOLVED, LESSON_STARTED, LESSON_COMPLETED, VISUALIZATION_VIEWED, REASSESSMENT_STARTED, REASSESSMENT_COMPLETED, MASTERY_UPDATED] (REQUIRED)",
   "entityType": "String",
-  "entityId": "ObjectId",
+  "entityId": "uuid",
   "metadata": "Object",
   "timestamp": "Date (REQUIRED)"
 }
@@ -489,4 +489,4 @@ Immutable historical timeline recording every event in the system.
 
 Document 1 is locked. All field structures, relationship boundaries, enums, index strategies, and lifecycle steps are established.
 
-**Next Document**: `Document 2 — LLM Knowledge Extraction` (PDF → extraction → cleaning → chunking → embeddings → LLM concept extraction → relationship extraction → prerequisite detection → validation → knowledge graph → MongoDB).
+**Next Document**: `Document 2 — LLM Knowledge Extraction` (PDF → extraction → cleaning → chunking → embeddings → LLM concept extraction → relationship extraction → prerequisite detection → validation → knowledge graph → Supabase PostgreSQL/pgvector).

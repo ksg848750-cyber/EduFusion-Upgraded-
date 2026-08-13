@@ -57,7 +57,7 @@ Every reassessment object maintains explicit provenance to the original diagnosi
 
 ```json
 {
-  "_id": "reassess_001",
+  "id": "reassess_001",
   "originalDiagnosisId": "diagnosis_001",
   "lessonId": "lesson_001",
   "targetConceptId": "concept_data_hazard",
@@ -90,7 +90,7 @@ The Learner Model represents EduFusion's **current state of belief** regarding a
 
 ```json
 {
-  "_id": "lm_001",
+  "id": "lm_001",
   "userId": "user_001",
   "subjectId": "subject_001",
   "overallMastery": 0.54,

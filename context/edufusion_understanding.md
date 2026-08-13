@@ -30,7 +30,7 @@
 | Visualization | Mandatory for every intervention. Not optional, not decorative |
 | Reassessment | Must target the same gap. Not a generic re-quiz |
 | Mastery calculation | Deterministic formula. Not LLM-generated |
-| Learner model update | Must persist to MongoDB after every session |
+| Learner model update | Must persist to Supabase PostgreSQL after every session |
 
 ### The test for any proposed shortcut
 Before cutting or simulating any component, ask:
@@ -98,10 +98,10 @@ If failed → different strategy or prerequisite repair
 | Decision | Locked To |
 |---|---|
 | Core loop | ASSESS → DIAGNOSE → FIND WHY → DECIDE WHAT → DECIDE HOW → EXPLAIN + VISUALIZE → REASSESS → UPDATE → REPEAT |
-| Auth | Better Auth + JWT → FastAPI |
+| Auth | Supabase Auth + JWT → FastAPI |
 | Backend | FastAPI + Python |
-| Database | MongoDB Atlas |
-| Vector search | MongoDB Atlas Vector Search |
+| Database | Supabase PostgreSQL |
+| Vector search | pgvector (Supabase PostgreSQL) |
 | AI | Groq — Llama 3.3 70B (complex reasoning) + Llama 3.1 8B (simple/fast) |
 | Mastery calculation | Deterministic backend formula (formula itself = open decision, but the rule is locked) |
 | Visualization delivery | LLM outputs spec → Pydantic validates → renderer renders. Never LLM-generated code |
@@ -239,7 +239,7 @@ how one instruction depends on another before continuing."
 | Document extraction strategy | All of RAG and concept extraction |
 | LLM concept/relationship extraction prompts + output schemas | Concept graph generation |
 | Visualization registry (schema per type) | Intervention delivery |
-| Better Auth ↔ FastAPI JWT verification | Every authenticated endpoint |
+| Supabase Auth ↔ FastAPI JWT verification | Every authenticated endpoint |
 | Teaching-strategy taxonomy | Adaptive engine HOW decision |
 | RAG chunk metadata schema | Retrieval and grounding |
 
@@ -249,7 +249,7 @@ how one instruction depends on another before continuing."
 | Diagnostic question generation strategy | From concept node + expected reasoning |
 | Reassessment/adaptation policy | Max 3 attempts → prerequisite repair |
 | LLM model allocation | 70B for extraction/diagnosis/lesson, 8B for simpler calls |
-| MongoDB indexes | Define during data architecture document |
+| PostgreSQL indexes | Define during data architecture document |
 | MVP screens/navigation | Define during UX document |
 | Deployment + secrets | Vercel + Render, define during tech guide |
 
@@ -276,7 +276,7 @@ These are the only valid diagnostic outputs. The system must classify into one o
 
 2. LLM KNOWLEDGE EXTRACTION
    └── PDF → extract text → chunk → embed → store
-   └── LLM concept extraction → LLM relationship extraction → graph validation → MongoDB
+   └── LLM concept extraction → LLM relationship extraction → graph validation → Supabase PostgreSQL
 
 3. DIAGNOSTIC INTELLIGENCE
    └── Concept selection → question generation (diagnostic value, not topic coverage)
@@ -304,7 +304,7 @@ These are the only valid diagnostic outputs. The system must classify into one o
    └── Diagnostic → Diagnosis Reveal → Lesson → Visualization → Reassessment → Result → Learner Map
 
 9. TECHNOLOGY LEARNING GUIDE
-   └── FastAPI, MongoDB, Better Auth, Groq, MongoDB Vector Search, Framer Motion, SVG
+   └── FastAPI, Supabase PostgreSQL, Supabase Auth, Groq, pgvector, Framer Motion, SVG
    └── What it is, why we chose it, how it works, what we need to learn
 
 10. IMPLEMENTATION PLAN
@@ -329,7 +329,7 @@ Chunking (size + overlap = open decision)
       ↓
 Embedding model (provider = open decision)
       ↓
-MongoDB Atlas Vector Search (chunks stored with embeddings)
+pgvector Vector Search (Supabase PostgreSQL, chunks stored with embeddings)
       ↓
 LLM (70B): Concept extraction
       ↓
@@ -341,7 +341,7 @@ LLM (70B): Relationship extraction
       ↓
 Pydantic validation of both outputs
       ↓
-Concept Graph stored in MongoDB
+Concept Graph stored in Supabase PostgreSQL
       ↓
 EduFusion is now ready to assess the student on this material
 ```
@@ -386,7 +386,7 @@ This structure comes from LLM extraction of the uploaded notes — not from hard
 7. Reassessment targeting the same gap
 8. Deterministic mastery update (e.g. 21% → 67%)
 9. Failure → strategy change or prerequisite repair (demonstrable)
-10. Learner state persisted in MongoDB
+10. Learner state persisted in Supabase PostgreSQL
 
 ---
 

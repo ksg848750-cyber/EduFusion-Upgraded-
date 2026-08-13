@@ -17,7 +17,7 @@
 LANDING PAGE
      │
      ▼
-SIGN UP / LOGIN (Better Auth)
+SIGN UP / LOGIN (Supabase Auth)
      │
      ▼
 ONBOARDING (Goals & Optional Interests)
@@ -71,7 +71,7 @@ LEARNER MODEL UPDATED (Mastery & Misconceptions Updated)
 ---
 
 ### Screen 2: Authentication
-- **Powered By**: Better Auth.
+- **Powered By**: Supabase Auth.
 - **Layout**: Clean, minimal form supporting email/password or social OAuth.
 - **UI Focus**: Frictionless access directly into Onboarding or Dashboard.
 

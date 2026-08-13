@@ -1,571 +1,353 @@
-# AGENTS.md — EduFusion
+# AGENTS.md — EduFusion Implementation Constitution
 
-## 1. Project Identity
+## 1. Purpose
 
-You are working on **EduFusion**, an adaptive AI learning platform.
+This is the implementation authority for the clean EduFusion rebuild.
 
-EduFusion is NOT a generic PDF chatbot, quiz generator, or ChatGPT wrapper.
+Read `context/` before coding. Do not revive or migrate the old MongoDB/Better Auth implementation.
 
-Its core loop is:
+## 2. What EduFusion Is
 
-ASSESS → DIAGNOSE → FIND WHY → DECIDE WHAT → DECIDE HOW
-→ EXPLAIN + VISUALIZE → REASSESS → UPDATE LEARNER MODEL → REPEAT
+EduFusion is an adaptive AI learning system that:
+1. Extracts a concept graph from uploaded learning material.
+2. Models what the learner currently understands.
+3. Diagnoses *why* the learner struggles.
+4. Teaches the specific root cause with grounded explanation + mandatory technical visualization.
+5. Reassesses the same underlying gap with a novel scenario.
+6. Updates the learner model deterministically.
+7. Uses the updated learner state for the next adaptive action.
 
-The MVP implements the complete intelligence loop for **arbitrary subjects and uploaded learning material**. Computer Architecture / CPU Pipelining is a controlled validation/demo domain and source of specialized visualization renderers, not a limit on core subject support.
+Core loop:
 
----
+ASSESS → DIAGNOSE → FIND WHY → DECIDE WHAT → DECIDE HOW → EXPLAIN + VISUALIZE → REASSESS → UPDATE → REPEAT
 
-## 2. Authoritative Project Context
+This is the product. Do not turn it into a generic chatbot, PDF chatbot, or quiz generator.
 
-The `/context/` directory contains the project's locked technical specifications and product definition.
+## 3. MVP Rules
 
-**Read the relevant context documents before making architectural or implementation decisions.**
+The hackathon demo uses controlled Computer Architecture / CPU Pipelining material, but the concept graph and intelligence must still be generated from the actual uploaded material.
 
-The context includes:
+Must be real:
+- PDF ingestion
+- extraction
+- chunking
+- embeddings + pgvector
+- LLM concept/relationship extraction
+- graph validation
+- diagnostic reasoning
+- root-cause analysis
+- prerequisite traversal
+- adaptive teaching decisions
+- grounded lessons
+- mandatory visualization
+- targeted reassessment
+- deterministic mastery update
+- persistent learner model
+- learning history
 
-- `doc1_data_architecture.md`
-- `doc2_llm_knowledge_extraction.md`
-- `doc3_diagnostic_intelligence.md`
-- `doc4_adaptive_teaching_engine.md`
-- `doc5_visualization_engine.md`
-- `doc6_reassessment_learner_model.md`
-- `doc7_api_specification.md`
-- `doc8_ux_screen_specification.md`
-- `doc9_technology_learning_guide.md`
-- `doc10_implementation_plan.md`
-- `doc11_database_schema.md`
-- `doc12_ai_llm_architecture.md`
-- `edufusion_understanding.md`
+May be narrow:
+- one controlled demo material
+- three specialized visual renderers: Pipeline, Hazard, Forwarding
+- no OCR/scanned-PDF support
+- limited analytics/gamification/voice
 
-`edufusion_understanding.md` is the final aligned product understanding and supersedes earlier informal assumptions.
+Forbidden:
+- hardcoded concept graph
+- hardcoded diagnosis
+- fake LLM extraction
+- LLM-generated React/JS code
+- LLM-generated mastery percentages
+- simulated intelligence presented as real
 
-The documents are the primary architectural source of truth. Do not silently replace their decisions with generic industry patterns.
+## 4. Locked Architecture
 
-If two documents appear inconsistent, identify the conflict and resolve it deliberately rather than silently inventing a third architecture.
+Frontend:
+- Next.js 16 / App Router
+- React 19
+- TypeScript
+- Tailwind CSS
+- SVG + Framer Motion
 
----
+Backend:
+- FastAPI
+- Python 3.11+
+- Pydantic v2
+- PyMuPDF or pypdf
 
-## 3. Existing Code Must Be Preserved
+Platform:
+- Supabase Auth
+- Supabase PostgreSQL
+- pgvector
+- Supabase Storage
 
-This is an existing repository, not a blank project.
+AI:
+- Groq SDK
+- Llama 3.3 70B for complex reasoning
+- Llama 3.1 8B for simple/fast tasks where appropriate
 
-Before writing code:
+Authentication:
+- Supabase Auth issues JWTs.
+- FastAPI verifies JWTs using Supabase JWKS/public keys.
+- Never trust arbitrary browser-supplied user IDs.
 
-1. Inspect the repository.
-2. Inspect `backend/` and `frontend/`.
-3. Inspect existing tests.
-4. Read the relevant context documents.
-5. Determine what is already implemented.
-6. Only then modify or add code.
+Secrets never enter frontend bundles:
+- Supabase service-role key
+- Groq API key
+- database connection strings
 
-**Do not rebuild existing functionality from scratch.**
+## 5. Canonical Data Model
 
-Prefer small, traceable changes over unnecessary rewrites.
+Use PostgreSQL UUIDs.
 
----
+Core entities:
+users
+subjects
+materials
+document_chunks
+concepts
+concept_relationships
+learner_models
+misconceptions
+diagnostic_sessions
+questions
+answers
+diagnoses
+lessons
+reassessments
+learning_events
 
-## 4. Implementation Order
+Use **current-state + event-history**, not full event sourcing:
+- `learner_models` = current learner state
+- `misconceptions` = current misconception state
+- `answers`, `diagnoses`, `reassessments`, `learning_events` = historical evidence
 
-Follow `context/doc10_implementation_plan.md`.
+Canonical naming:
+- one `questions` table; use `questionType`
+- root causes:
+  - MISSING_PREREQUISITE
+  - MISCONCEPTION
+  - PROCEDURAL_ERROR
+  - TERMINOLOGY_CONFUSION
+  - REPRESENTATION_PROBLEM
+  - INSUFFICIENT_EVIDENCE
+- application users live in `users`, linked to Supabase Auth through `authUserId`
+- uploaded files use Supabase Storage; `materials.storageReference` stores the reference
 
-The project has eight milestones:
+## 6. Diagnostic Rules
 
-### Milestone 1 — Foundation & Auth
-- Git repository and directory structure
-- Better Auth + JWT issuance
-- FastAPI server
-- JWKS token validation middleware
-- MongoDB Atlas connection
-- `users` collection
+A wrong answer is never automatically a misconception.
 
-### Milestone 2 — Knowledge Ingestion & Graph
-- PDF extraction with page retention
-- Structural cleaning
-- Semantic chunking
-- Embeddings + MongoDB Vector Search
-- LLM concept extraction
-- LLM relationship extraction
-- Pydantic validation
-- Deterministic graph validation
-- Knowledge Graph UI
-
-### Milestone 3 — Diagnostic Reasoning
-- Diagnostic sessions
-- Scenario questions with `diagnosticTargets`
-- Response + reasoning capture
-- LLM evidence extraction
-- Six-category root-cause diagnosis
-- Prerequisite traversal
-- "Why We Think This" evidence UI
-
-### Milestone 4 — Adaptive Teaching
-- WHAT-to-teach decision
-- HOW-to-teach decision
-- Strategy selection
-- RAG grounding
-- Interest-context adaptation
-
-### Milestone 5 — Visualization
-- Declarative `visualizationSpec`
-- Pydantic validation
-- Visualization registry
-- Pipeline / Hazard / Forwarding renderers
-- SVG + Framer Motion player
-- Generic fallback renderers
-
-### Milestone 6 — Reassessment & Learner Model
-- Targeted reassessment
-- PASSED / FAILED / INCONCLUSIVE evaluation
-- Deterministic mastery engine
-- Learner model updates
-- Misconception lifecycle
-- Immutable `learning_events`
-
-### Milestone 7 — Stitch UI Refinement
-- Design system integration
-- Responsive layouts
-- Error / empty / loading states
-- Dashboard and analytics
-
-### Milestone 8 — Demo & Deployment
-- Golden end-to-end demo
-- Secret isolation
-- Deployment
-- Final rehearsal
-
-**Do not jump ahead to later milestone implementation unless explicitly instructed.**
-
----
-
-## 5. Critical Product Rule: Wrong Answer ≠ Misconception
-
-This is one of the most important rules in the entire system.
-
-Never implement:
-
-`wrong answer → misconception`
-
-A wrong answer can indicate:
-
+Possible causes:
 - missing prerequisite
 - misconception
 - procedural error
 - terminology confusion
 - representation problem
 - insufficient evidence
-- misunderstanding the question
-- guessing or poor signal
 
-The diagnostic architecture is:
+Student reasoning is a primary signal.
 
-`student answer + reasoning`
-→ evidence analysis
-→ determine whether evidence is conclusive
-→ if ambiguous, generate a targeted probe
-→ analyze probe evidence
-→ final root-cause diagnosis
+If evidence is ambiguous:
+initial evidence → candidate hypotheses → targeted probe → probe reasoning → final diagnosis
 
-The six valid root-cause categories are:
+Probe support remains part of the architecture even if the hackathon demo does not showcase it.
 
-1. `MISSING_PREREQUISITE`
-2. `MISCONCEPTION` / the project's conceptual-misunderstanding category where the relevant schema uses that name
-3. `PROCEDURAL_ERROR`
-4. `TERMINOLOGY_CONFUSION`
-5. `REPRESENTATION_PROBLEM`
-6. `INSUFFICIENT_EVIDENCE`
+## 7. Adaptive Teaching
 
-Follow the exact enum used by the relevant current schema when implementing it.
+WHAT to teach:
+- missing prerequisite → prerequisite repair
+- misconception → mental-model correction/counterexample
+- procedural error → guided practice
+- terminology confusion → contrast/distinction
+- representation problem → representation shift
+- insufficient evidence → targeted probe
 
-Diagnostic probes are an investigation mechanism, not a normal quiz feature.
+HOW to teach:
+- use learner strategy history
+- avoid previously ineffective strategies
+- prioritize previously effective strategies
+- escalate after failed reassessment
+- eventually step back to prerequisite
 
----
+Do not use fixed “learning styles”.
 
-## 6. EduFusion Must Actually Be Adaptive
+## 8. Visualization
 
-Do not fake the intelligence with hardcoded demo paths.
+Every delivered intervention must include a visualization.
 
-The MVP must actually:
+Flow:
+LLM → declarative visualizationSpec JSON → Pydantic validation → Visualization Registry → deterministic React renderer
 
-- extract concepts from uploaded material
-- build the concept graph from that material
-- analyze real student reasoning
-- diagnose root cause using evidence
-- traverse actual prerequisites
-- choose what to teach
-- choose how to teach
-- ground lessons with retrieved source material
-- generate a visualization specification
-- render the visualization deterministically
-- reassess the same underlying gap using a novel scenario
-- calculate mastery deterministically
-- persist learner state
-- preserve historical learning events
+LLM must never generate executable frontend code.
 
-A controlled CPU Pipelining PDF is acceptable for demo scope.
+MVP renderers:
+- PIPELINE
+- HAZARD
+- FORWARDING
 
-A hardcoded CPU Pipelining graph pretending to be extracted from the PDF is not.
+Use generic fallback renderers when needed.
 
----
+Interest context changes narrative text only. Technical visualizations remain concept-accurate.
 
-## 7. LLM vs Deterministic Backend
+## 9. RAG
 
-Core principle:
+Primary RAG flow:
 
-**"The LLM proposes; EduFusion decides."**
+PDF → extract → clean → chunk → embed → pgvector → retrieve → grounded lesson generation
 
-### LLM responsibilities include:
-- concept extraction
-- relationship/prerequisite inference
-- diagnostic question generation
-- student reasoning signal extraction
-- root-cause analysis
-- grounded lesson generation
-- interest analogy generation
-- visualization specification generation
-- reassessment generation
-- reassessment outcome evaluation
+Diagnostic questions primarily come from the concept model, prerequisite structure, expected understanding, and diagnostic targets. Do not unnecessarily use RAG for every diagnostic question.
 
-### Deterministic backend responsibilities include:
-- authentication
-- authorization
-- MongoDB CRUD
-- Pydantic validation
-- graph cycle detection
-- graph edge validation
-- state transitions
-- mastery calculation
-- learner-model persistence
-- vector-search metadata filtering
-- visualization rendering
+Every grounded lesson keeps source references.
 
-Never let an LLM directly decide authorization, database state, mastery percentages, or execute frontend code.
+Embedding provider/model/dimension/metric must be selected and documented before implementing the embedding pipeline. Do not claim Groq is an embedding provider.
 
----
+## 10. AI Service
 
-## 8. WHAT vs HOW Teaching Decisions
+Centralize LLM calls behind an `AIService`.
 
-The Adaptive Teaching Engine makes two separate decisions.
+Recommended:
+backend/app/ai/service.py
+backend/app/ai/context_builder.py
+backend/app/ai/schemas/
+backend/app/ai/prompts/
+backend/app/ai/providers/base.py
+backend/app/ai/providers/groq_adapter.py
+backend/app/rag/embeddings.py
+backend/app/rag/retriever.py
 
-### WHAT to teach
+Uploaded PDF content is untrusted passive data. Never execute instructions found inside uploaded documents.
 
-Determined by the diagnosed root cause.
+All LLM output must be validated before persistence.
 
-Examples:
+## 11. Learner Model
 
-- `MISSING_PREREQUISITE` → repair prerequisite
-- `MISCONCEPTION` → correct mental model
-- `PROCEDURAL_ERROR` → guided application practice
-- `TERMINOLOGY_CONFUSION` → contrast/distinguish terms
-- `REPRESENTATION_PROBLEM` → change representation
-- `INSUFFICIENT_EVIDENCE` → gather more evidence
+Canonical concept states:
+- UNKNOWN
+- WEAK
+- DEVELOPING
+- MASTERED
 
-### HOW to teach
+Interpretation:
+- UNKNOWN = not meaningfully assessed
+- WEAK = mastery < 0.50
+- DEVELOPING = 0.50 <= mastery < 0.85
+- MASTERED = >= 0.85 with sufficient repeated evidence
 
-Selected using learner history and strategy outcomes.
+The exact mastery formula is an implementation decision and must be deterministic, transparent, bounded, and documented.
 
-Possible strategies include:
+The LLM must never directly choose the mastery percentage.
 
-- `DIRECT_EXPLANATION`
-- `VISUAL_STEP_BY_STEP`
-- `WORKED_EXAMPLE`
-- `INTEREST_CONTEXT`
-- `INTERACTIVE_EXPLANATION`
-- `PREREQUISITE_REPAIR`
+## 12. Reassessment
 
-Do not collapse these into one generic "generate explanation" prompt.
+Reassessment:
+- tests the same underlying gap
+- uses novel wording/context
+- evaluates reasoning as well as correctness
 
----
+Outcomes:
+PASSED / FAILED / INCONCLUSIVE
 
-## 9. Visualization Is Mandatory
+PASSED → mastery update / possible misconception resolution
+FAILED → strategy change or prerequisite repair
+INCONCLUSIVE → more evidence/probe
 
-Every explanation delivered by EduFusion must have a visualization.
+Maximum intervention attempts for MVP: 3.
 
-The LLM outputs a **declarative `visualizationSpec`**.
+## 13. UX
 
-The backend validates it.
+Journey:
+Landing → Login → Onboarding → Dashboard → Subject → Upload → Knowledge Graph → Diagnostic → Diagnosis / Why We Think This → Learning Path → Lesson + Visualization → Reassessment → Learner Model Update
 
-The frontend renders it.
+“Why We Think This” must be visible.
+The adaptive decision must be visible.
 
-The LLM must NEVER generate or execute React/JS/HTML visualization code at runtime.
+Do not make the product look like a generic chatbot.
 
-Architecture:
+## 14. Milestone Discipline
 
-`LLM → visualizationSpec → Pydantic validation → registry → deterministic renderer`
+Build exactly one milestone at a time.
 
-For the MVP, implement the CPU Pipelining renderers required by the implementation plan:
+### Milestone 1 — Foundation & Auth
 
-- Pipeline
-- Hazard
-- Forwarding
+Build only:
+- clean Git repository
+- frontend/
+- backend/
+- Supabase Auth
+- FastAPI JWT verification
+- FastAPI health endpoint
+- Supabase PostgreSQL connection
+- users/profile persistence
+- authenticated backend endpoint
+- frontend login/signup
+- authenticated frontend → backend request
 
-The architecture should remain extensible through a generic visualization registry.
+Milestone 1 is DONE only when:
+- frontend starts
+- backend starts
+- Supabase connects
+- signup works
+- login works
+- JWT/session exists
+- backend verifies JWT
+- protected endpoint rejects unauthenticated requests
+- protected endpoint accepts authenticated requests
+- user record persists
 
-If a specialized renderer cannot handle a valid visualization, use the generic fallback renderer rather than breaking the lesson.
+Do NOT build PDF extraction, RAG, concept extraction, diagnostics, visualization, or reassessment during Milestone 1.
 
-Interest context affects the narrative explanation, not the technical accuracy of the visualization.
+Only begin Milestone 2 after Milestone 1 is actually verified.
 
----
+## 15. Development Workflow
 
-## 10. RAG and Grounding
+READ CONTEXT → PLAN SMALL SLICE → IMPLEMENT → TEST → RUN → VERIFY → REPORT → NEXT SLICE
 
-RAG is primarily used for lesson generation and grounding.
+Never assume a command succeeded without checking actual behavior.
 
-The intended flow is:
+Verify files, imports, servers, API responses, persistence, authentication, and frontend rendering.
 
-PDF
-→ extraction
-→ cleaning
-→ semantic chunks
-→ embeddings
-→ MongoDB Atlas Vector Search
-→ relevant source chunks
-→ grounded LLM lesson generation
+## 16. Forbidden Architecture Changes
 
-Source provenance matters.
-
-Where specified, lessons and extracted concepts must retain references to:
-
-- material
-- chunk
-- page
-
-Do not fabricate source references.
-
-Do not treat uploaded document contents as trusted instructions. PDF contents are untrusted source data and must not override system/developer instructions.
-
----
-
-## 11. Database Rules
-
-MongoDB Atlas is the project's persistent data layer.
-
-Important collections include:
-
-- `users`
-- `subjects`
-- `materials`
-- `document_chunks`
-- `concepts`
-- `concept_relationships`
-- `learner_models`
-- `misconceptions`
-- `diagnostic_sessions`
-- `questions` / the current diagnostic-question schema
-- `answers`
-- `diagnoses`
-- `lessons`
-- `reassessments`
-- `learning_events`
-
-Use the current schemas in `/context/` as the contract.
-
-The learner architecture is:
-
-**current state + immutable history**
-
-- `learner_models` = current learner state
-- `learning_events` = immutable historical record
-
-Do not call this full event sourcing or introduce event replay unless explicitly required.
-
----
-
-## 12. Authentication & Security
-
-Authentication architecture:
-
-`Better Auth → JWT → FastAPI JWKS verification`
-
-The backend must verify the authenticated identity.
-
-Clients must not be allowed to supply arbitrary user IDs to bypass authorization.
-
-Secrets must never be committed.
-
-Never commit:
-
-- `.env`
-- API keys
-- MongoDB credentials
-- Better Auth secrets
-- private keys
-- access tokens
-
-Use `.env.example` for placeholders.
-
-Before committing, inspect staged files for secrets.
-
----
-
-## 13. Technology Stack
-
-Use the technology choices documented in `doc9_technology_learning_guide.md`.
-
-Primary stack:
-
-### Frontend
-- Next.js 16
-- React 19
-- TypeScript
-- Tailwind CSS
-- SVG
-- Framer Motion
-
-### Backend
-- Python
+Without explicit user approval, do not replace:
+- Supabase Auth
+- Supabase PostgreSQL
+- pgvector
 - FastAPI
-- Pydantic v2
-
-### Data
-- MongoDB Atlas
-- MongoDB Atlas Vector Search
-
-### AI
+- Next.js
 - Groq
-- Llama models as specified in the context documents
+- Pydantic
+- deterministic SVG/React renderers
 
-### Document processing
-- PyMuPDF / pypdf
-
-### Auth
+Do not introduce:
+- MongoDB
 - Better Auth
-- JWT / JWKS
+- Firebase as primary backend
+- Neo4j
+- Pinecone
+- Qdrant
+- Redis
+- LangChain
+- LlamaIndex
+- Docker/Kubernetes
 
-### Design
-- Stitch MCP
+## 17. First Task in Fresh Repository
 
-Do not introduce unnecessary frameworks simply because they are popular.
+Before application code:
+1. Read `AGENTS.md`.
+2. Read `context/edufusion_understanding.md`.
+3. Read Docs 1, 7, 8, 9, 10.
+4. Inspect the clean repository.
+5. Propose the exact Milestone 1 structure.
+6. Implement Milestone 1 only.
+7. Verify it end-to-end.
+8. Report what passed and what remains.
 
-The architecture deliberately avoids LangChain/LlamaIndex, Qdrant/Pinecone, Neo4j, Redis, and unnecessary container orchestration for the MVP unless the project specifications are explicitly changed.
+Do not start Milestone 2 until explicitly told.
 
----
+## 18. Final Rule
 
-## 14. Testing
+For every shortcut ask:
 
-A feature is not complete merely because the code compiles.
+“Are we still building EduFusion, or are we building a polished educational chatbot?”
 
-For every meaningful implementation unit:
-
-1. Implement.
-2. Run tests.
-3. Fix failures.
-4. Test the real integration where possible.
-5. Verify persistence and authorization.
-6. Only then mark it complete.
-
-The project's Definition of Done requires:
-
-- backend logic tested
-- Pydantic schemas validated
-- MongoDB persistence verified
-- frontend feature rendered
-- authorization checked
-- error handling verified
-
-For AI features, also test structured output contracts and controlled evaluation cases.
-
----
-
-## 15. Development Style
-
-Keep implementation understandable.
-
-The developer is learning while building this project.
-
-After a meaningful implementation unit, explain:
-
-- what was built
-- files changed
-- why the component exists
-- how it connects to the architecture
-- how it was tested
-
-Do not hide important architectural decisions.
-
-Avoid unnecessary abstraction.
-
-Avoid premature optimization.
-
-Prefer explicit, readable Python and TypeScript.
-
----
-
-## 16. Git Discipline
-
-Use meaningful commits.
-
-Examples:
-
-- `feat: add better auth setup`
-- `feat: add jwks validation middleware`
-- `feat: connect mongodb atlas`
-- `test: verify milestone 1 auth flow`
-
-Do not force-push unless explicitly instructed.
-
-Do not commit secrets.
-
-Do not mix unrelated changes into one commit.
-
----
-
-## 17. How to Handle Conflicts or Ambiguity
-
-If existing code conflicts with a context document:
-
-1. Do not silently choose one.
-2. Identify the conflict.
-3. Inspect the relevant documents.
-4. Explain the impact.
-5. Preserve working code until the intended resolution is clear.
-
-If a schema uses a different enum/name from another document, use the most recent/current contract and explicitly flag the inconsistency.
-
-Do not invent missing architecture.
-
----
-
-## 18. Current Task
-
-Before changing code, inspect the current repository and context.
-
-The immediate implementation target is:
-
-**MILESTONE 1 — FOUNDATION & AUTH**
-
-Specifically verify:
-
-- repository structure
-- frontend/backend setup
-- Better Auth configuration
-- JWT issuance
-- FastAPI server
-- JWKS validation middleware
-- MongoDB Atlas connection
-- `users` collection
-- Milestone 1 integration tests
-
-### First response after loading this project
-
-Do NOT immediately start coding.
-
-First report:
-
-1. What you found in the repository.
-2. What Milestone 1 components already exist.
-3. What is incomplete.
-4. What is incorrect or risky.
-5. What files you intend to change.
-6. The exact test/verification plan.
-
-Then proceed with implementation.
-
----
-
-## 19. Golden Rule
-
-When making any decision, ask:
-
-> **"Does this help us build the actual EduFusion intelligence described in `/context/`, or are we merely building a polished educational chatbot?"**
-
-If it turns EduFusion into the latter, do not take the shortcut.
+If the shortcut produces the latter, do not take it.

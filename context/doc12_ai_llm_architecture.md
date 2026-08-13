@@ -32,7 +32,7 @@
 ┌───────────────────────────────────────────────┐
 │            DETERMINISTIC BACKEND RULES        │
 │  - Authentication & Authorization             │
-│  - MongoDB CRUD & Versioning                  │
+│  - Supabase PostgreSQL CRUD & Versioning              │
 │  - Graph Cycle Validation (DFS)               │
 │  - Pydantic Schema Validation                 │
 │  - Mastery Formula Calculations               │
@@ -65,7 +65,7 @@ backend/app/
 │
 └── rag/
     ├── embeddings.py         # Embedding model caller
-    └── retriever.py          # Metadata-filtered MongoDB Vector Search
+    └── retriever.py          # Metadata-filtered pgvector Vector Search
 ```
 
 ---
@@ -155,17 +155,17 @@ The design phase for EduFusion is 100% complete and fully locked across 12 compr
 
 | Doc # | Master Specification Title | Status |
 |---|---|---|
-| **Doc 1** | Data Architecture (Schemas, Indexes, Collections) | ✅ LOCKED |
+| **Doc 1** | Data Architecture (Schemas, Indexes, Tables) | ✅ LOCKED |
 | **Doc 2** | LLM Knowledge Extraction Architecture (PDF $\rightarrow$ Graph) | ✅ LOCKED |
 | **Doc 3** | Diagnostic Intelligence Architecture (Reasoning $\rightarrow$ Root Cause) | ✅ LOCKED |
 | **Doc 4** | Adaptive Teaching Engine Architecture (WHAT & HOW Decisions) | ✅ LOCKED |
 | **Doc 5** | Visualization Engine Architecture (Declarative Specs & Renderers) | ✅ LOCKED |
 | **Doc 6** | Reassessment & Learner Model Architecture (Verification & Memory) | ✅ LOCKED |
-| **Doc 7** | API Specification & Flow Architecture (FastAPI & Better Auth Contracts) | ✅ LOCKED |
+| **Doc 7** | API Specification & Flow Architecture (FastAPI & Supabase Auth Contracts) | ✅ LOCKED |
 | **Doc 8** | UX / Screen & Interaction Specification (Stitch MCP Design System) | ✅ LOCKED |
 | **Doc 9** | Technology Architecture & Learning Guide (Stack & Defense Q&A) | ✅ LOCKED |
 | **Doc 10** | Implementation Plan (Milestones, Slices, & Demo Sequence) | ✅ LOCKED |
-| **Doc 11** | Database Schema & Data Models (16 Collections Specification) | ✅ LOCKED |
+| **Doc 11** | Database Schema & Data Models (16 Tables Specification) | ✅ LOCKED |
 | **Doc 12** | AI / LLM Architecture & Prompt Engineering (Brain & Guardrails) | ✅ LOCKED |
 
 ---
@@ -182,7 +182,7 @@ The design phase for EduFusion is 100% complete and fully locked across 12 compr
                           LLM Knowledge Extraction
                                      │
                                      ▼
-                           MongoDB Knowledge Graph
+                           Supabase PostgreSQL Knowledge Graph
                                      │
                                      ▼
                          Diagnostic Scenario Engine
