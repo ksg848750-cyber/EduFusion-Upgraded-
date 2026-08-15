@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     # Storage
     supabase_storage_bucket: str = "materials"
 
+    # OCR fallback (RapidOCR) for scanned / image-only pages.
+    ocr_enabled: bool = True
+
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]

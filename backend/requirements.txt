@@ -13,3 +13,6 @@ python-multipart>=0.0.9
 pymupdf>=1.24.0
 groq>=0.11.0
 fastembed>=0.3.0
+
+# OCR fallback for scanned / image-only pages (self-contained ONNX, no external binary)
+rapidocr-onnxruntime>=1.2.0

@@ -19,6 +19,27 @@ _MAX_ACRONYM_LEN = 8
 
 _NUMBERED_HEADING = re.compile(r"^\s*\d+(?:\.\d+)*[\.\s:)]*")
 
+# OCR frequently glues a short acronym onto a following descriptive word with no
+# space ("C-LOOKscheduling", "SSTF(shortestseektimefirst)algorithm"). When
+# concept names differ only by such a descriptor suffix we treat them as the
+# same concept. The whitelist keeps this deterministic and conservative: only
+# these generic educational descriptor words may be stripped, so unrelated
+# acronyms ("net" vs "network") are never merged.
+_ACRONYM_SUFFIXES = frozenset(
+    w
+    for w in [
+        "algorithm", "algorithms", "scheduling", "method", "methods",
+        "technique", "techniques", "strategy", "strategies", "model", "models",
+        "system", "systems", "operation", "operations", "process", "procedure",
+        "approach", "structure", "structures", "protocol", "framework",
+        "management", "policy", "policies", "mechanism", "mechanisms",
+        "service", "services",
+    ]
+)
+
+# Leading acronym detected in an original (case-preserving) concept name.
+_LEADING_ACRONYM = re.compile(r"[^A-Za-z]*([A-Z][A-Z\-]*[A-Z])")
+
 
 def _clean_enumerated_name(text: str) -> str:
     """Strip a leading numbering/bullet prefix from an enumerated sub-topic."""
@@ -30,6 +51,17 @@ def _singular_plural_variant(key: str) -> str:
     return key[:-1] if key.endswith("s") else key + "s"
 
 
+def _is_reasonable_parent(text: str) -> bool:
+    """A parent section is seedable only when its name is a real multi-word
+    section title (not a fragment like "Methods" or a diagram label)."""
+    if not text:
+        return False
+    norm = normalize_key(text)
+    if not norm or norm in _FURNITURE:
+        return False
+    return len(norm.split()) >= 2
+
+
 def _seed_enumerated_topics(concepts: list[PlannedConcept], chunks: list[dict]) -> list[PlannedConcept]:
     """Deterministically add enumerated sub-topics the LLM may have omitted.
 
@@ -39,6 +71,12 @@ def _seed_enumerated_topics(concepts: list[PlannedConcept], chunks: list[dict]) 
     concept belonging to that section. This makes the graph complete and stable
     regardless of LLM extraction variance. Only leaf, numbered sub-topics with
     at least one numbered sibling are seeded; nothing is fabricated.
+
+    The enumerating section itself is also materialised (if not already a
+    concept) so seeded sub-topics get a real PART_OF parent instead of being
+    dropped as "unknown endpoint" -- this is what lets OCR-recovered document
+    hierarchy (whose parent section is not always extracted by the LLM) appear
+    in the graph.
     """
     from collections import defaultdict
 
@@ -53,7 +91,13 @@ def _seed_enumerated_topics(concepts: list[PlannedConcept], chunks: list[dict]) 
         for i in range(1, len(path)):
             parent_children[tuple(path[:i])].append((path[i], [idx]))
 
-    existing = {normalize_key(c.canonical_name) for c in concepts}
+    def find_match(name: str) -> PlannedConcept | None:
+        key = normalize_key(name)
+        for c in concepts + additions:
+            if _concept_matches(normalize_key(c.canonical_name), c, key, name):
+                return c
+        return None
+
     additions: list[PlannedConcept] = []
 
     for parent_key, children in parent_children.items():
@@ -64,10 +108,34 @@ def _seed_enumerated_topics(concepts: list[PlannedConcept], chunks: list[dict]) 
         if len(numbered) < 2:
             continue
         parent_text = parent_key[-1] if parent_key else ""
+        if not _is_reasonable_parent(parent_text):
+            continue
+        # Resolve the parent concept, tolerating singular/plural variants.
+        parent = find_match(parent_text)
+        if parent is None:
+            parent = find_match(_singular_plural_variant(parent_text))
+        if parent is None:
+            parent = PlannedConcept(
+                canonical_name=parent_text,
+                name=parent_text,
+                description="",
+                difficulty=3,
+                expected_understanding="",
+                common_misconceptions=[],
+                source_chunks=[],
+                parent_concept=None,
+            )
+            additions.append(parent)
+        parent_name = parent.canonical_name
         for text, idxs in numbered:
             clean = _clean_enumerated_name(text)
             key = normalize_key(clean)
-            if not key or key in existing or key in _FURNITURE:
+            if not key or key in _FURNITURE:
+                continue
+            child = find_match(clean)
+            if child is not None:
+                if not child.parent_concept:
+                    child.parent_concept = parent_name
                 continue
             additions.append(
                 PlannedConcept(
@@ -78,10 +146,9 @@ def _seed_enumerated_topics(concepts: list[PlannedConcept], chunks: list[dict]) 
                     expected_understanding="",
                     common_misconceptions=[],
                     source_chunks=list(dict.fromkeys(idxs)),
-                    parent_concept=parent_text or None,
+                    parent_concept=parent_name,
                 )
             )
-            existing.add(key)
 
     return concepts + additions
 
@@ -133,7 +200,56 @@ def _is_acronym(text: str) -> bool:
     return " " not in text and 2 <= len(text) <= _MAX_ACRONYM_LEN and text.isalpha()
 
 
-def _concept_matches(existing_key: str, existing: PlannedConcept, key: str) -> bool:
+def _leading_acronym(name: str) -> str:
+    """Lowercased genuine leading acronym of an original concept name, or ''.
+
+    Requires 2+ uppercase letters so normal capitalised words ("File",
+    "Directory") are NOT treated as acronyms. Hyphenated acronyms ("C-LOOK",
+    "C-SCAN") are handled.
+    """
+    m = _LEADING_ACRONYM.match(name)
+    if not m:
+        return ""
+    return "".join(ch for ch in m.group(1) if ch.isalpha()).lower()
+
+
+def _descriptor_ok(remainder: str) -> bool:
+    """True when a key remainder is empty or decomposes into descriptor words.
+
+    Greedy longest-match over the whitelist, so glued compounds such as
+    'schedulingalgorithm' are recognised as 'scheduling' + 'algorithm'.
+    """
+    if not remainder:
+        return True
+    i = 0
+    while i < len(remainder):
+        for word in sorted(_ACRONYM_SUFFIXES, key=len, reverse=True):
+            if remainder.startswith(word, i):
+                i += len(word)
+                break
+        else:
+            return False
+    return True
+
+
+def _ocr_same_concept(a_name: str, b_name: str) -> bool:
+    """OCR concatenation match: two names are the same concept when they share a
+    genuine leading acronym and differ only by an optional descriptor suffix.
+
+    Gated on a real (uppercase) acronym appearing on at least one side, so
+    lowercase words ("file" vs "file systems") are never merged.
+    """
+    ac = _leading_acronym(a_name) or _leading_acronym(b_name)
+    if not ac:
+        return False
+    blob_a = "".join(normalize_key(a_name).split())
+    blob_b = "".join(normalize_key(b_name).split())
+    if not (blob_a.startswith(ac) and blob_b.startswith(ac)):
+        return False
+    return _descriptor_ok(blob_a[len(ac):]) and _descriptor_ok(blob_b[len(ac):])
+
+
+def _concept_matches(existing_key: str, existing: PlannedConcept, key: str, incoming_name: str = "") -> bool:
     """Return True when key denotes the same concept as existing_key."""
     if key == existing_key:
         return True
@@ -141,6 +257,10 @@ def _concept_matches(existing_key: str, existing: PlannedConcept, key: str) -> b
     if _is_acronym(key) and " " in existing_key and _initials(existing_key) == key:
         return True
     if _is_acronym(existing_key) and " " in key and _initials(key) == existing_key:
+        return True
+    # OCR token-concatenation merge (e.g. "c look" <-> "c lookscheduling",
+    # "sstf" <-> "sstfalgorithm"); requires a genuine acronym + descriptor tail.
+    if incoming_name and _ocr_same_concept(existing.name, incoming_name):
         return True
     return False
 
@@ -198,7 +318,7 @@ def _dedup_concepts(extraction: KnowledgeExtraction) -> list[PlannedConcept]:
         )
         merged = False
         for i, existing in enumerate(seen):
-            if _concept_matches(normalize_key(existing.canonical_name), existing, key):
+            if _concept_matches(normalize_key(existing.canonical_name), existing, key, concept.name):
                 _merge_into(existing, incoming)
                 merged = True
                 break

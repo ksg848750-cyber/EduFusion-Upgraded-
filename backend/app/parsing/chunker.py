@@ -9,6 +9,10 @@ DEFAULT_OVERLAP_CHARS = 150
 
 _HEADING_MAX_LEN = 60
 _HEADING_HINT = re.compile(r"^\d+(\.\d+)*[)\s:.\-]|^[A-Z][A-Za-z ]{2,}:?$")
+# Stricter title-case hint for scanned pages: short multi-word line where every
+# alphabetic word starts with an uppercase letter. This excludes diagram/table
+# labels and sentence-case fragments that OCR turns into noise headings.
+_TITLE_HINT = re.compile(r"^[A-Z][A-Za-z0-9&]*(\s+[A-Z][A-Za-z0-9&]*)+:?$")
 _SENTENCE_END = re.compile(r"[.!?]$")
 _NUMBERED = re.compile(r"^(\d+(?:\.\d+)*)")
 
@@ -20,9 +24,10 @@ class ExtractedChunk:
     page_number: int
     section_title: str | None = None
     heading_path: list[str] = field(default_factory=list)
+    ocr_page_numbers: list[int] = field(default_factory=list)
 
 
-def _looks_like_heading(text: str) -> bool:
+def _looks_like_heading(text: str, title_case_only: bool = False) -> bool:
     stripped = strip_leading_glyphs(text).strip()
     if not stripped or len(stripped) > _HEADING_MAX_LEN:
         return False
@@ -30,6 +35,12 @@ def _looks_like_heading(text: str) -> bool:
         return False
     if "\n" in stripped:
         return False
+    if title_case_only:
+        # Scanned pages: no font info, so only accept clear numbered headings or
+        # short all-Title-Case lines. Sentence-case fragments and single-word
+        # diagram labels are NOT treated as headings.
+        numbered = bool(re.match(r"^\d+(\.\d+)*[)\s:.\-]", stripped))
+        return numbered or bool(_TITLE_HINT.match(stripped))
     return bool(_HEADING_HINT.match(stripped))
 
 
@@ -108,9 +119,10 @@ def chunk_document(
     chunk_len = 0
     has_new = False
     current_page: int | None = None
+    current_ocr_pages: set[int] = set()
 
     def flush_chunk():
-        nonlocal chunk_paras, chunk_len, has_new, current_page
+        nonlocal chunk_paras, chunk_len, has_new, current_page, current_ocr_pages
         if not chunk_paras or not has_new:
             return
         chunks.append(
@@ -120,6 +132,7 @@ def chunk_document(
                 page_number=current_page or 1,
                 section_title=current_heading,
                 heading_path=[h for _, h in heading_stack],
+                ocr_page_numbers=sorted(current_ocr_pages),
             )
         )
         tail: list[str] = []
@@ -133,23 +146,26 @@ def chunk_document(
         chunk_len = tail_len
         has_new = False
         current_page = None
+        current_ocr_pages = set()
 
-    def add_piece(text: str, page_number: int):
-        nonlocal chunk_paras, chunk_len, has_new, current_page
+    def add_piece(text: str, page_number: int, ocr_used: bool):
+        nonlocal chunk_paras, chunk_len, has_new, current_page, current_ocr_pages
         if chunk_len + len(text) > max_chars and chunk_paras:
             flush_chunk()
         if current_page is None:
             current_page = page_number
+        if ocr_used:
+            current_ocr_pages.add(page_number)
         chunk_paras.append(text)
         chunk_len += len(text)
         has_new = True
 
-    def add_para(text: str, page_number: int):
+    def add_para(text: str, page_number: int, ocr_used: bool):
         if len(text) > max_chars:
             for piece in _split_oversized(text, max_chars):
-                add_piece(piece, page_number)
+                add_piece(piece, page_number, ocr_used)
         else:
-            add_piece(text, page_number)
+            add_piece(text, page_number, ocr_used)
 
     def push_heading(text: str, level: int):
         nonlocal heading_stack, current_heading
@@ -177,18 +193,18 @@ def chunk_document(
             line = strip_leading_glyphs(raw).strip()
             if not line:
                 if para_lines:
-                    add_para(" ".join(para_lines), page.page_number)
+                    add_para(" ".join(para_lines), page.page_number, page.ocr_used)
                     page_had_body = True
                     para_lines = []
                 continue
             norm = _normalize_heading(line)
             level = lookup.get(norm)
             is_heading = level is not None or (
-                _looks_like_heading(line) and len(line) <= _HEADING_MAX_LEN
+                _looks_like_heading(line, title_case_only=page.ocr_used) and len(line) <= _HEADING_MAX_LEN
             )
             if is_heading:
                 if para_lines:
-                    add_para(" ".join(para_lines), page.page_number)
+                    add_para(" ".join(para_lines), page.page_number, page.ocr_used)
                     page_had_body = True
                     para_lines = []
                 level = _level_for(line, page.headings, heading_stack)
@@ -203,7 +219,7 @@ def chunk_document(
             else:
                 para_lines.append(line)
         if para_lines:
-            add_para(" ".join(para_lines), page.page_number)
+            add_para(" ".join(para_lines), page.page_number, page.ocr_used)
             page_had_body = True
         # A section whose content is entirely images/tables still has headings;
         # surface them as topic chunks so the structure is visible to extraction.
@@ -216,6 +232,7 @@ def chunk_document(
                         page_number=page.page_number,
                         section_title=clean,
                         heading_path=path,
+                        ocr_page_numbers=[page.page_number] if page.ocr_used else [],
                     )
                 )
         else:

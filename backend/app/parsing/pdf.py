@@ -1,7 +1,12 @@
+import logging
 from dataclasses import dataclass, field
 import statistics
 
 import pymupdf as fitz  # PyMuPDF
+
+from app.parsing.ocr import OCR_SCALE, OcrEngine, get_ocr_engine, needs_ocr
+
+logger = logging.getLogger(__name__)
 
 _HEADING_MAX_CHARS = 60
 _HEADING_MIN_SIZE_RATIO = 1.12
@@ -19,6 +24,7 @@ class PageText:
     page_number: int
     text: str
     headings: list[Heading] = field(default_factory=list)
+    ocr_used: bool = False
 
 
 def _extract_headings(page) -> list[Heading]:
@@ -77,10 +83,31 @@ def _rank_headings(candidates: list[tuple[float, str, bool]], body: float) -> li
     return headings
 
 
-def extract_pages(content: bytes) -> list[PageText]:
-    """Extract text per page (plus detected headings) from a text-based PDF.
+def _render_page_png(page) -> bytes:
+    """Render a page to grayscale PNG bytes for OCR input."""
+    pix = page.get_pixmap(matrix=fitz.Matrix(OCR_SCALE, OCR_SCALE), colorspace=fitz.csGRAY)
+    return pix.tobytes("png")
 
-    MVP supports text-based PDFs only (no OCR / scanned images).
+
+def _ocr_page(page, ocr: OcrEngine) -> str:
+    """OCR a single page; returns recognized text or '' (never raises)."""
+    try:
+        return ocr.recognize(_render_page_png(page))
+    except Exception as exc:  # noqa: BLE001 - a single page must not kill ingestion
+        logger.warning("OCR failed on page %s: %s", getattr(page, "number", "?"), exc)
+        return ""
+
+
+def extract_pages(
+    content: bytes,
+    ocr: OcrEngine | None = None,
+    ocr_enabled: bool = True,
+) -> list[PageText]:
+    """Extract text per page (plus detected headings) from a PDF.
+
+    Uses PyMuPDF selectable text by default. Pages that fail a quality heuristic
+    (scanned / image-only / sparse-noisy) are rendered to an image and OCR'd via
+    RapidOCR as a fallback. OCR text reuses the same cleaning/chunking pipeline.
     Raises on malformed or non-PDF input.
     """
     try:
@@ -91,12 +118,22 @@ def extract_pages(content: bytes) -> list[PageText]:
     pages: list[PageText] = []
     try:
         for page_index, page in enumerate(doc, start=1):
-            text = page.get_text("text")
+            text = page.get_text("text") or ""
+            ocr_used = False
+            if ocr_enabled:
+                has_image = bool(page.get_images(full=True))
+                if needs_ocr(text, has_image):
+                    engine = ocr or get_ocr_engine()
+                    ocr_text = _ocr_page(page, engine)
+                    if ocr_text.strip():
+                        ocr_used = True
+                        text = ocr_text
             pages.append(
                 PageText(
                     page_number=page_index,
                     text=text or "",
                     headings=_extract_headings(page),
+                    ocr_used=ocr_used,
                 )
             )
     finally:

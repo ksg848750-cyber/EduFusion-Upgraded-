@@ -3,6 +3,7 @@ from typing import Any
 
 from app.ai.schemas.extraction import KnowledgeExtraction
 from app.ai.service import AIService
+from app.core.config import get_settings
 from app.parsing.chunker import ExtractedChunk, chunk_document
 from app.parsing.pdf import extract_pages
 from app.rag.embeddings import embed_texts
@@ -28,6 +29,7 @@ def _chunk_to_dict(chunk: ExtractedChunk) -> dict[str, Any]:
         "pageNumber": chunk.page_number,
         "sectionTitle": chunk.section_title,
         "headingPath": chunk.heading_path,
+        "ocrPages": chunk.ocr_page_numbers,
     }
 
 
@@ -50,7 +52,7 @@ async def process_material(
         if not content.startswith(PDF_MAGIC):
             raise IngestionError("Only text-based PDF files are supported")
 
-        pages = extract_pages(content)
+        pages = extract_pages(content, ocr_enabled=get_settings().ocr_enabled)
         extracted_chunks = chunk_document(pages)
 
         if not extracted_chunks:
@@ -70,7 +72,7 @@ async def process_material(
                 text=chunk.text,
                 page_number=chunk.page_number,
                 section_title=chunk.section_title,
-                metadata={"section": chunk.section_title, "headingPath": chunk.heading_path},
+                metadata={"section": chunk.section_title, "headingPath": chunk.heading_path, "ocrPages": chunk.ocr_page_numbers},
                 embedding=embedding,
             )
 
