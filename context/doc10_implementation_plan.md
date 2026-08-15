@@ -38,33 +38,61 @@ MILESTONE 2: KNOWLEDGE INGESTION & GRAPH
   ├─ Deterministic Graph Validator (Cycle & edge checking)
   └─ Knowledge Graph UI Map (Stitch checkpoint #1)
 
-MILESTONE 3: DIAGNOSTIC REASONING ENGINE
-  ├─ Diagnostic Session Manager (`diagnostic_sessions`)
+MILESTONE 3: ADAPTIVE LEARNER MODEL & TOPIC UNDERSTANDING
+  ├─ Concept-level Learner Model (`learner_models`, `misconceptions`)
+  ├─ Concept study intent choice: [Understand this topic] vs [Test myself]
+  ├─ Grounded adaptive explanation (Understand mode, RAG + graph position)
+  ├─ Grounded question generation (Test mode, per-concept, source chunks)
+  ├─ Answer + reasoning evaluation and evidence-signal extraction
+  ├─ Deterministic Backend Mastery Engine (evidence-weighted, bounded)
+  ├─ Misconception lifecycle (SUSPECTED → CONFIRMED, evidence-backed)
+  └─ Immutable History Logger (`learning_events`; `questions`, `answers`,
+     `diagnostic_sessions` evidence store)
+
+  NOTE: The original M3 (Diagnostic Reasoning Engine with root-cause classifier and
+  "Why We Think This" bundle) is RENUMBERED. The diagnostic-session/question/answer
+  building blocks now live in M3; the root-cause classifier + prerequisite traversal +
+  "Why We Think This" evidence bundle move to M4 (Diagnostic Reasoning), keeping the
+  canonical 6 root causes and probe architecture from Doc 3. See doc13_m3_learner_model_spec.md.
+
+MILESTONE 4: DIAGNOSTIC REASONING ENGINE
+  ├─ Diagnostic Session Manager (`diagnostic_sessions` — sessions now start in M3)
   ├─ Scenario Question Generation with mandatory `diagnosticTargets`
-  ├─ Response & Reasoning capture UI
-  ├─ LLM Evidence Signal Extraction
+  ├─ Response & Reasoning capture UI (question/answer primitives now in M3)
+  ├─ LLM Evidence Signal Extraction (reuses M3 answer-evaluation signals)
   ├─ Root-Cause Classifier (6 categories) + Prerequisite Traversal
   └─ "Why We Think This" UI Evidence Bundle
 
-MILESTONE 4: ADAPTIVE TEACHING ENGINE
+MILESTONE 5: ADAPTIVE TEACHING ENGINE
   ├─ Dual-Decision Engine (WHAT to teach vs HOW to teach)
   ├─ Strategy Selector (`VISUAL_STEP_BY_STEP`, `WORKED_EXAMPLE`, etc.)
-  ├─ RAG Grounding pipeline (retrieving source chunks)
+  ├─ RAG Grounding pipeline (retrieving source chunks; M3 establishes the pattern)
   └─ Contextual Interest Analogy engine (`cricket`, `anime`, `normal`)
 
-MILESTONE 5: VISUALIZATION ENGINE
+MILESTONE 6: VISUALIZATION ENGINE
   ├─ Declarative `visualizationSpec` Pydantic validator
   ├─ Visualization Registry implementation
   ├─ CPU Pipelining Renderers (`PipelineRenderer`, `HazardRenderer`, `ForwardingRenderer`)
   ├─ SVG + Framer Motion synchronized animation player (Play, Pause, Step)
   └─ Generic Fallback Renderers (`GenericProcessRenderer`)
 
-MILESTONE 6: REASSESSMENT & LEARNER MODEL CLOSED LOOP
+MILESTONE 7: REASSESSMENT & LEARNER MODEL CLOSED LOOP
   ├─ Targeted Reassessment Question Generator (Novel Scenario, Same Gap)
   ├─ Reassessment Evaluation (`PASSED`, `FAILED`, `INCONCLUSIVE`)
-  ├─ Deterministic Backend Mastery Engine
-  ├─ Learner Model State Update (`learner_models` & `misconceptions`)
-  └─ Immutable History Logger (`learning_events`)
+  ├─ Mastery Engine update (reuses M3 deterministic mastery engine)
+  ├─ Learner Model State Update (`learner_models` & `misconceptions` — rows now exist from M3)
+  └─ Immutable History Logger (`learning_events` — pipeline now live from M3)
+
+MILESTONE 8: STITCH MCP UI REFINEMENT
+  ├─ Stitch Design System Integration (Typography, Tokens, Components)
+  ├─ Mobile & Desktop responsive layout polish
+  ├─ Error, Empty, and Loading state polish
+  └─ Student Dashboard & Analytics integration
+
+MILESTONE 9: DEMO REHEARSAL & DEPLOYMENT
+  ├─ Golden End-to-End Demo Test Case verification
+  ├─ Secret isolation & deployment (Next.js on Vercel, FastAPI on Render)
+  └─ Final demo rehearsal
 
 MILESTONE 7: STITCH MCP UI REFINEMENT
   ├─ Stitch Design System Integration (Typography, Tokens, Components)

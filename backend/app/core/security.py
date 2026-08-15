@@ -54,7 +54,10 @@ async def verify_jwt(token: str) -> dict[str, Any]:
     Raises HTTPException(401) when the token is invalid/expired.
     """
     settings = get_settings()
-    unverified = jwt.decode(token, options={"verify_signature": False})
+    try:
+        unverified = jwt.decode(token, options={"verify_signature": False})
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
     kid = unverified.get("kid")
     alg = jwt.get_unverified_header(token).get("alg", "RS256")
     issuer = f"{settings.supabase_url.rstrip('/')}/auth/v1"

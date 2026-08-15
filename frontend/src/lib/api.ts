@@ -142,3 +142,133 @@ export async function fetchKnowledgeGraph(subjectId: string): Promise<KnowledgeG
   const res = await authedFetch(`/subjects/${subjectId}/knowledge-graph`);
   return res.json();
 }
+
+// ---- Milestone 3: adaptive learner model & topic understanding ----
+
+export type ConceptState = {
+  conceptId: string;
+  conceptName: string;
+  mastery: number;
+  status: "UNKNOWN" | "WEAK" | "DEVELOPING" | "MASTERED";
+  confidence: number;
+  interactionCount: number;
+  correctCount: number;
+  incorrectCount: number;
+  lastAssessedAt: string | null;
+};
+
+export type Misconception = {
+  id: string;
+  category: string;
+  statement: string;
+  confidence: number;
+  status: string;
+  evidenceReferences: Record<string, unknown>[];
+};
+
+export type ConceptLearner = {
+  subjectId: string;
+  conceptId: string;
+  conceptName: string;
+  state: ConceptState;
+  misconceptions: Misconception[];
+};
+
+export type ExplanationSection = {
+  heading: string;
+  body: string;
+  sourceChunks: number[];
+};
+
+export type ConceptExplanation = {
+  summary: string;
+  sections: ExplanationSection[];
+  example: string;
+  commonConfusion: string;
+  sourceChunks: number[];
+};
+
+export type ExplanationResponse = {
+  conceptId: string;
+  conceptName: string;
+  explanation: ConceptExplanation;
+};
+
+export type McqOption = {
+  id: string;
+  text: string;
+};
+
+export type TestQuestion = {
+  id: string;
+  questionText: string;
+  questionType: string;
+  difficulty: number;
+  diagnosticTargets: string[];
+  sourceChunks: number[];
+  options: McqOption[];
+};
+
+export type TestStartResponse = {
+  sessionId: string;
+  conceptId: string;
+  questions: TestQuestion[];
+};
+
+export type AnswerResponse = {
+  answerId: string;
+  correct: boolean;
+  reasoningQuality: string;
+  explanation: string;
+  evidenceSignals: string[];
+  conceptState: ConceptState;
+  misconception: Misconception | null;
+};
+
+export async function fetchConceptLearner(
+  subjectId: string,
+  conceptId: string,
+): Promise<ConceptLearner> {
+  const res = await authedFetch(`/subjects/${subjectId}/concepts/${conceptId}/learner`);
+  return res.json();
+}
+
+export async function explainConcept(
+  subjectId: string,
+  conceptId: string,
+): Promise<ExplanationResponse> {
+  const res = await authedFetch(`/subjects/${subjectId}/concepts/${conceptId}/explain`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  return res.json();
+}
+
+export async function startConceptTest(
+  subjectId: string,
+  conceptId: string,
+): Promise<TestStartResponse> {
+  const res = await authedFetch(`/subjects/${subjectId}/concepts/${conceptId}/test`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  return res.json();
+}
+
+export async function submitAnswer(
+  subjectId: string,
+  sessionId: string,
+  questionId: string,
+  response: string,
+  reasoning: string,
+  selectedOptionId?: string,
+): Promise<AnswerResponse> {
+  const res = await authedFetch(`/subjects/${subjectId}/sessions/${sessionId}/answers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ questionId, response, reasoning, selectedOptionId }),
+  });
+  return res.json();
+}

@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 import KnowledgeGraph from "@/components/knowledge-graph";
+import ConceptStudy from "@/components/concept-study";
 import {
   fetchKnowledgeGraph,
   KnowledgeGraph as KnowledgeGraphData,
   listMaterials,
   Material,
+  Concept,
   uploadMaterial,
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
@@ -33,6 +35,8 @@ export default function SubjectPage({ params }: { params: Promise<{ subjectId: s
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const [study, setStudy] = useState<{ concept: Concept; mode: "understand" | "test" } | null>(null);
 
   async function refresh() {
     const [g, m] = await Promise.all([
@@ -166,8 +170,19 @@ export default function SubjectPage({ params }: { params: Promise<{ subjectId: s
             concepts={graph?.concepts ?? []}
             relationships={graph?.relationships ?? []}
             subjectName={graph?.subject.name}
+            onStudy={(concept, mode) => setStudy({ concept, mode })}
           />
         </section>
+
+        {study && (
+          <ConceptStudy
+            subjectId={subjectId}
+            concept={study.concept}
+            mode={study.mode}
+            onClose={() => setStudy(null)}
+            onModeChange={(mode) => setStudy((prev) => (prev ? { ...prev, mode } : prev))}
+          />
+        )}
 
         <section>
           <h2 className="mb-3 text-lg font-semibold text-black dark:text-zinc-50">

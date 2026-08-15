@@ -240,9 +240,10 @@ type DrawerProps = {
   byId: Map<string, Concept>;
   onSelect: (id: string) => void;
   onClose: () => void;
+  onStudy: (concept: Concept, mode: "understand" | "test") => void;
 };
 
-function Drawer({ concept, label, isRoot, childrenIds, parents, relationships, byId, onSelect, onClose }: DrawerProps) {
+function Drawer({ concept, label, isRoot, childrenIds, parents, relationships, byId, onSelect, onClose, onStudy }: DrawerProps) {
   const diff = concept.difficulty ?? 0;
   const diffLabel = diff >= 4 ? "Advanced" : diff === 3 ? "Intermediate" : diff === 2 ? "Foundation" : "Basic";
   return (
@@ -260,6 +261,28 @@ function Drawer({ concept, label, isRoot, childrenIds, parents, relationships, b
           ✕
         </button>
       </div>
+
+      {!isRoot && (
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+            Adaptive learning
+          </p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              onClick={() => onStudy(concept, "understand")}
+              className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-300"
+            >
+              Understand this topic
+            </button>
+            <button
+              onClick={() => onStudy(concept, "test")}
+              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-800 transition-colors hover:border-teal-600 hover:text-teal-700 dark:border-zinc-600 dark:text-zinc-200 dark:hover:border-teal-400 dark:hover:text-teal-300"
+            >
+              Test myself
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4 py-4">
         {!isRoot && (
@@ -388,10 +411,12 @@ export default function KnowledgeGraph({
   concepts,
   relationships,
   subjectName,
+  onStudy,
 }: {
   concepts: Concept[];
   relationships: Relationship[];
   subjectName?: string;
+  onStudy?: (concept: Concept, mode: "understand" | "test") => void;
 }) {
   const [mode, setMode] = useState<"map" | "graph">("map");
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([ROOT_ID]));
@@ -671,10 +696,11 @@ export default function KnowledgeGraph({
           isRoot={selectedId === ROOT_ID}
           childrenIds={selectedChildren}
           parents={selectedParents}
-          relationships={selectedRelationships}
+relationships={selectedRelationships}
           byId={idx.byId}
           onSelect={select}
           onClose={() => setSelectedId(null)}
+          onStudy={onStudy ?? (() => {})}
         />
       )}
     </div>
