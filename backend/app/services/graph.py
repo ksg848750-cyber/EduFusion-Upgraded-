@@ -14,6 +14,21 @@ _FURNITURE = {
     "questions", "review questions", "objectives", "learning objectives",
 }
 
+# Administrative cover-page metadata that must never become concepts. Modelled on
+# the Mentra reference project's metadata-noise pre-filter (subject codes, course
+# outcome tables, PO-PO/CO-PO mappings, accreditation, institution headers, etc.).
+_METADATA_NOISE = {
+    "subject code", "subject name", "course code", "course name",
+    "course objectives", "course outcomes", "learning outcomes",
+    "co po mapping", "co-po mapping", "po co mapping", "po-co mapping",
+    "program outcomes", "program educational objectives", "peo",
+    "department", "department of", "batch", "academic year", "year sem",
+    "rbt level", "bloom's taxonomy level", "accreditation", "institution",
+    "institute", "syllabus", "regulation", "credit", "credits", "hours",
+    "prerequisite knowledge", "course description", "institute name",
+    "university", "affiliated college",
+}
+
 _MAX_RELATED_PER_NODE = 8
 _MAX_ACRONYM_LEN = 8
 
@@ -262,14 +277,69 @@ def _concept_matches(existing_key: str, existing: PlannedConcept, key: str, inco
     # "sstf" <-> "sstfalgorithm"); requires a genuine acronym + descriptor tail.
     if incoming_name and _ocr_same_concept(existing.name, incoming_name):
         return True
+    # near-variant spelling merge ("acyclic graph director" <-> "acyclic graph
+    # directory") for multi-word names differing in exactly one close token.
+    if _near_variant_same_concept(existing_key, key):
+        return True
     return False
 
 
+def _lev(a: str, b: str) -> int:
+    """Levenshtein edit distance between two lowercase strings."""
+    if a == b:
+        return 0
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, start=1):
+        cur = [i] + [0] * len(b)
+        for j, cb in enumerate(b, start=1):
+            cur[j] = min(
+                cur[j - 1] + 1,
+                prev[j] + 1,
+                prev[j - 1] + (ca != cb),
+            )
+        prev = cur
+    return prev[-1]
+
+
+def _common_prefix_len(a: str, b: str) -> int:
+    n = 0
+    for x, y in zip(a, b):
+        if x != y:
+            break
+        n += 1
+    return n
+
+
+def _near_variant_same_concept(a_key: str, b_key: str) -> bool:
+    """Conservative merge of multi-word concepts that differ in exactly one
+    token which is itself a near-identical spelling variant (edit distance <= 1
+    with a shared prefix), e.g. "acyclic graph director" vs
+    "acyclic graph directory". Single-word names are never merged here (they are
+    handled by the dedicated fragment logic) and names differing in more than
+    one token are left distinct."""
+    aw, bw = a_key.split(), b_key.split()
+    if len(aw) != len(bw) or len(aw) < 2:
+        return False
+    differing = [(x, y) for x, y in zip(aw, bw) if x != y]
+    if len(differing) != 1:
+        return False
+    x, y = differing[0]
+    if _lev(x, y) > 1:
+        return False
+    return _common_prefix_len(x, y) >= 3
+
+
 def _merge_into(existing: PlannedConcept, incoming: PlannedConcept) -> None:
-    # prefer the expanded, more informative display name; keep the shorter canonical
-    if len(incoming.name.split()) > len(existing.name.split()):
+    # prefer the expanded, more informative display name; on a tie prefer the one
+    # backed by more evidence (so the correct spelling usually wins over a near
+    # misspelling such as "Director" vs "Directory").
+    a_words, b_words = len(existing.name.split()), len(incoming.name.split())
+    a_ev, b_ev = len(existing.source_chunks), len(incoming.source_chunks)
+    if b_words > a_words or (b_words == a_words and b_ev > a_ev):
         existing.name = incoming.name
-        existing.canonical_name = _choose_canonical(existing.canonical_name, incoming.canonical_name)
+    existing.canonical_name = _choose_canonical(
+        existing.canonical_name, incoming.canonical_name, a_ev, b_ev
+    )
     existing.description = incoming.description or existing.description
     if incoming.expected_understanding:
         existing.expected_understanding = incoming.expected_understanding
@@ -281,21 +351,85 @@ def _merge_into(existing: PlannedConcept, incoming: PlannedConcept) -> None:
     existing.source_chunks = list(dict.fromkeys(existing.source_chunks + incoming.source_chunks))
 
 
-def _choose_canonical(a: str, b: str) -> str:
-    # prefer the shorter (usually acronym) canonical label
+def _choose_canonical(a: str, b: str, a_chunks: int = 0, b_chunks: int = 0) -> str:
+    # prefer the shorter (usually acronym) canonical label; on equal length prefer
+    # the label backed by more evidence.
     ka, kb = normalize_key(a), normalize_key(b)
-    return a if len(ka.split()) <= len(kb.split()) else b
+    aw, bw = len(ka.split()), len(kb.split())
+    if aw < bw:
+        return a
+    if bw < aw:
+        return b
+    return a if a_chunks >= b_chunks else b
 
 
 def _drop_furniture(concepts: list[PlannedConcept]) -> list[PlannedConcept]:
     kept: list[PlannedConcept] = []
     for c in concepts:
-        if normalize_key(c.canonical_name) in _FURNITURE:
+        norm = normalize_key(c.canonical_name)
+        if norm in _FURNITURE or norm in _METADATA_NOISE:
             continue
         if not c.name.strip() or not c.canonical_name.strip():
             continue
         kept.append(c)
     return kept
+
+
+def _drop_prefix_fragments(concepts: list[PlannedConcept]) -> list[PlannedConcept]:
+    """Drop low-value single-word fragments that merely prefix a more complete
+    sibling concept ("Directory" beside "Directory Structures", "File" beside
+    "File Systems").
+
+    A fragment is removed only when ALL of these hold, so genuine top-level
+    concepts are never dropped:
+      - it is a single word,
+      - some other concept's normalized name starts with that word + space,
+      - it is NOT used as a parent_concept anywhere (i.e. it has no children),
+      - it carries strictly less source evidence than its most specific sibling.
+    """
+    parents = {normalize_key(c.parent_concept) for c in concepts if c.parent_concept}
+    counts = {normalize_key(c.canonical_name): len(c.source_chunks) for c in concepts}
+    names: dict[str, list[str]] = {}
+    for c in concepts:
+        names.setdefault(normalize_key(c.canonical_name), []).append(c.canonical_name)
+
+    kept: list[PlannedConcept] = []
+    for c in concepts:
+        key = normalize_key(c.canonical_name)
+        words = key.split()
+        if len(words) == 1:
+            fragment = words[0]
+            more_specific = [
+                k for k in counts
+                if k != key and k.startswith(fragment + " ")
+            ]
+            if (
+                more_specific
+                and key not in parents
+                and counts[key] < max(counts[m] for m in more_specific)
+            ):
+                continue  # drop the fragment
+        kept.append(c)
+    return kept
+
+
+def _collapse_redundant_edges(edges: list[PlannedEdge]) -> list[PlannedEdge]:
+    """Collapse redundant parallel edges: when the same ordered pair already has
+    the more specific INSTANCE_OF, a PART_OF edge on the same pair is dropped
+    (it is semantically subsumed and only inflates the graph for readability)."""
+    pair_types: dict[tuple[str, str], set[str]] = {}
+    for e in edges:
+        if not e.dropped:
+            pair_types.setdefault((e.from_canonical, e.to_canonical), set()).add(e.relationship_type)
+    for e in edges:
+        if (
+            not e.dropped
+            and e.relationship_type == "PART_OF"
+            and "INSTANCE_OF" in pair_types.get((e.from_canonical, e.to_canonical), ())
+        ):
+            e.dropped = True
+            e.drop_reason = "redundant with INSTANCE_OF on same pair"
+    return edges
 
 
 def _dedup_concepts(extraction: KnowledgeExtraction) -> list[PlannedConcept]:
@@ -365,6 +499,7 @@ def build_graph(extraction: KnowledgeExtraction, chunks: list[dict] | None = Non
     if chunks:
         concepts = _seed_enumerated_topics(concepts, chunks)
     concepts = _drop_furniture(concepts)
+    concepts = _drop_prefix_fragments(concepts)
     # Map normalized key -> persisted canonical_name. Edge endpoints are matched
     # on normalized keys (so "direct_access" == "direct access") but emitted with
     # the canonical names so they resolve to concept IDs on persistence.
@@ -425,7 +560,9 @@ def build_graph(extraction: KnowledgeExtraction, chunks: list[dict] | None = Non
                  relationship.relationship_type, relationship.confidence,
                  relationship.reason, list(relationship.source_chunks))
 
-    # 3. Cap dense RELATED_TO connections per node for readability.
+    # 3. Collapse redundant PART_OF alongside INSTANCE_OF, then cap dense
+    #    RELATED_TO connections per node for readability.
+    edges = _collapse_redundant_edges(edges)
     edges = _cap_related(edges)
 
     # 4. Cycle check over directed ordering edges.

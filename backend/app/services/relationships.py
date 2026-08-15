@@ -50,7 +50,7 @@ async def list_relationships(subject_id: str) -> list[dict[str, Any]]:
         rows = await conn.execute(
             """
             SELECT cr.id, cr.from_concept_id, cr.to_concept_id, cr.relationship_type,
-                   cr.confidence,
+                   cr.confidence, cr.extraction_metadata, cr.source_references,
                    fc.canonical_name, tc.canonical_name
             FROM public.concept_relationships cr
             JOIN public.concepts fc ON fc.id = cr.from_concept_id
@@ -66,8 +66,10 @@ async def list_relationships(subject_id: str) -> list[dict[str, Any]]:
                 "toConceptId": str(r[2]),
                 "relationshipType": r[3],
                 "confidence": float(r[4]),
-                "fromName": r[5],
-                "toName": r[6],
+                "reason": (r[5] or {}).get("reason", ""),
+                "sourceReferences": [int(s.get("chunkIndex", 0)) for s in (r[6] or [])],
+                "fromName": r[7],
+                "toName": r[8],
             }
             for r in await rows.fetchall()
         ]

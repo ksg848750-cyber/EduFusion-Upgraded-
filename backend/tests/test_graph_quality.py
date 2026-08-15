@@ -249,3 +249,149 @@ def test_parent_resolution_tolerates_singular_plural():
     plan = build_graph(ex, chunks=chunks)
     part_of = _edges(plan, "PART_OF")
     assert ("Acyclic Graph Directory", "directory_structure") in part_of
+
+
+def test_near_variant_spelling_deduplicated():
+    # OCR/LLM misspelling "Directory" as "Director" must collapse to one concept,
+    # and the more-evidenced (correct) spelling should win as the canonical name.
+    ex = _extraction(
+        [
+            {"name": "Acyclic Graph Directory", "canonical_name": "acyclic graph directory",
+             "source_chunks": [1, 2]},
+            {"name": "Acyclic Graph Director", "canonical_name": "acyclic graph director",
+             "source_chunks": [1]},
+        ],
+        [],
+    )
+    plan = build_graph(ex)
+    assert len(plan.concepts) == 1
+    assert plan.concepts[0].canonical_name == "acyclic graph directory"
+    assert plan.concepts[0].source_chunks == [1, 2]
+
+
+def test_near_variant_does_not_merge_unrelated_one_token():
+    # A single differing token that is NOT a near spelling variant must stay separate.
+    ex = _extraction(
+        [
+            {"name": "Binary Search", "canonical_name": "binary search"},
+            {"name": "Binary Tree", "canonical_name": "binary tree"},
+        ],
+        [],
+    )
+    plan = build_graph(ex)
+    assert len(plan.concepts) == 2
+
+
+def test_near_variant_ignores_single_word_names():
+    # Single-word concepts are never merged by the near-variant rule.
+    ex = _extraction(
+        [
+            {"name": "Cache", "canonical_name": "cache"},
+            {"name": "Cachet", "canonical_name": "cachet"},
+        ],
+        [],
+    )
+    plan = build_graph(ex)
+    assert len(plan.concepts) == 2
+
+
+def test_drops_single_word_prefix_fragment():
+    # "Directory" is a fragment beside "Directory Structures" -> dropped generically.
+    ex = _extraction(
+        [
+            {"name": "Directory", "canonical_name": "directory", "source_chunks": [1]},
+            {"name": "Directory Structures", "canonical_name": "directory structures",
+             "source_chunks": [1, 2, 3, 4, 5, 6, 7, 8, 9]},
+        ],
+        [],
+    )
+    plan = build_graph(ex)
+    names = _names(plan)
+    assert "directory structures" in names
+    assert "directory" not in names
+
+
+def test_prefix_fragment_preserved_when_it_is_a_parent():
+    # "File" owns a child so it is a genuine top-level concept -> never dropped.
+    ex = _extraction(
+        [
+            {"name": "File", "canonical_name": "file", "source_chunks": [1]},
+            {"name": "File Systems", "canonical_name": "file systems", "source_chunks": [2, 3]},
+            {"name": "File Types", "canonical_name": "file types", "source_chunks": [4],
+             "parent_concept": "file"},
+        ],
+        [],
+    )
+    plan = build_graph(ex)
+    assert "file" in _names(plan)
+    assert "file systems" in _names(plan)
+    assert len(plan.concepts) == 3
+
+
+def test_prefix_logic_never_drops_multiword_topics():
+    # Multi-word topics are never treated as fragments.
+    ex = _extraction(
+        [
+            {"name": "Disk Scheduling", "canonical_name": "disk scheduling", "source_chunks": [1]},
+            {"name": "Disk Scheduling Algorithms", "canonical_name": "disk scheduling algorithms",
+             "source_chunks": [2]},
+        ],
+        [],
+    )
+    plan = build_graph(ex)
+    assert len(plan.concepts) == 2
+    assert "disk scheduling" in _names(plan)
+
+
+def test_redundant_part_of_collapsed_with_instance_of():
+    # When the same ordered pair has both, keep the more specific INSTANCE_OF and
+    # drop the subsumed PART_OF (reduces graph edge noise for readability).
+    ex = _extraction(
+        [
+            {"name": "FCFS", "canonical_name": "fcfs"},
+            {"name": "Disk Scheduling Algorithms", "canonical_name": "disk scheduling algorithms"},
+        ],
+        [
+            {"from_concept": "fcfs", "to_concept": "disk scheduling algorithms",
+             "relationship_type": "PART_OF", "confidence": 0.9},
+            {"from_concept": "fcfs", "to_concept": "disk scheduling algorithms",
+             "relationship_type": "INSTANCE_OF", "confidence": 0.9},
+        ],
+    )
+    plan = build_graph(ex)
+    assert len(_edges(plan, "INSTANCE_OF")) == 1
+    assert len(_edges(plan, "PART_OF")) == 0
+    assert any(e.drop_reason == "redundant with INSTANCE_OF on same pair"
+               for e in plan.dropped_edges)
+
+
+def test_redundant_collapse_keeps_part_of_without_instance_of():
+    # A PART_OF edge with no matching INSTANCE_OF is unaffected.
+    ex = _extraction(
+        [
+            {"name": "FCFS", "canonical_name": "fcfs"},
+            {"name": "Disk Scheduling", "canonical_name": "disk scheduling"},
+        ],
+        [{"from_concept": "fcfs", "to_concept": "disk scheduling",
+          "relationship_type": "PART_OF", "confidence": 0.9}],
+    )
+    plan = build_graph(ex)
+    assert len(_edges(plan, "PART_OF")) == 1
+    assert not plan.dropped_edges
+
+
+def test_metadata_noise_concepts_rejected():
+    # Cover-page administrative metadata must never become concepts.
+    ex = _extraction(
+        [
+            {"name": "Course Outcomes", "canonical_name": "course outcomes"},
+            {"name": "CO-PO Mapping", "canonical_name": "co-po mapping"},
+            {"name": "Syllabus", "canonical_name": "syllabus"},
+            {"name": "File Systems", "canonical_name": "file systems"},
+        ],
+        [],
+    )
+    plan = build_graph(ex)
+    names = _names(plan)
+    assert "file systems" in names
+    assert {"course outcomes", "co-po mapping", "syllabus"} & names == set()

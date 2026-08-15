@@ -50,7 +50,7 @@ async def list_concepts(subject_id: str) -> list[dict[str, Any]]:
         rows = await conn.execute(
             """
             SELECT id, name, canonical_name, description, difficulty,
-                   expected_understanding, common_misconceptions
+                   expected_understanding, common_misconceptions, source_references
             FROM public.concepts
             WHERE subject_id = %s
             ORDER BY name
@@ -66,6 +66,7 @@ async def list_concepts(subject_id: str) -> list[dict[str, Any]]:
                 "difficulty": r[4],
                 "expectedUnderstanding": r[5],
                 "commonMisconceptions": r[6],
+                "sourceReferences": [int(s.get("chunkIndex", 0)) for s in (r[7] or [])],
             }
             for r in await rows.fetchall()
         ]

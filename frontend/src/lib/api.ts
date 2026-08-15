@@ -76,6 +76,7 @@ export type Concept = {
   difficulty: number;
   expectedUnderstanding: string;
   commonMisconceptions: string[];
+  sourceReferences?: number[];
 };
 
 export type Relationship = {
@@ -86,6 +87,8 @@ export type Relationship = {
   confidence: number;
   fromName: string;
   toName: string;
+  reason?: string;
+  sourceReferences?: number[];
 };
 
 export type KnowledgeGraph = {

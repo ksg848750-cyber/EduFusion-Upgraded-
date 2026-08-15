@@ -165,6 +165,7 @@ export default function SubjectPage({ params }: { params: Promise<{ subjectId: s
           <KnowledgeGraph
             concepts={graph?.concepts ?? []}
             relationships={graph?.relationships ?? []}
+            subjectName={graph?.subject.name}
           />
         </section>
 
