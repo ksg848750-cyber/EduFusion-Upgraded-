@@ -36,7 +36,7 @@ class McqOption(BaseModel):
 
 class GeneratedQuestion(BaseModel):
     questionText: str = Field(min_length=1)
-    questionType: Literal["SCENARIO", "SHORT_ANSWER", "MCQ"] = "SHORT_ANSWER"
+    questionType: Literal["SCENARIO", "SHORT_ANSWER", "MCQ", "PROBE"] = "SHORT_ANSWER"
     difficulty: int = Field(ge=1, le=5, default=3)
     expectedAnswer: str = Field(min_length=1)
     expectedReasoning: str = ""
@@ -65,6 +65,39 @@ class GeneratedQuestion(BaseModel):
 
 class QuestionSet(BaseModel):
     questions: list[GeneratedQuestion] = Field(min_length=1, max_length=5)
+
+
+class ProbeQuestion(BaseModel):
+    """A single targeted probe generated to disambiguate an ambiguous signal
+    (doc3). Carries the differentiation target: the two competing hypotheses
+    the probe must confirm or refute."""
+    questionText: str = Field(min_length=1)
+    questionType: Literal["SCENARIO", "SHORT_ANSWER", "MCQ"] = "MCQ"
+    difficulty: int = Field(ge=1, le=5, default=3)
+    expectedAnswer: str = Field(min_length=1)
+    expectedReasoning: str = ""
+    diagnosticTargets: list[str] = Field(default_factory=list)
+    sourceChunks: list[int] = Field(default_factory=list)
+    options: list[McqOption] = Field(default_factory=list)
+    correctOptionId: str = ""
+    differentiationTarget: dict = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _validate_mcq(self):
+        if self.questionType == "MCQ":
+            if len(self.options) < 2:
+                raise ValueError("MCQ requires at least 2 options")
+            ids = [o.id for o in self.options]
+            if len(ids) != len(set(ids)):
+                raise ValueError("MCQ option ids must be unique")
+            if self.correctOptionId not in ids:
+                raise ValueError("correctOptionId must reference one of the options")
+        else:
+            if self.options:
+                raise ValueError("options are only allowed for MCQ questions")
+            if self.correctOptionId:
+                raise ValueError("correctOptionId is only allowed for MCQ questions")
+        return self
 
 
 class MisconceptionHypothesis(BaseModel):

@@ -19,8 +19,11 @@ class Settings(BaseSettings):
 
     # AI / Groq
     groq_api_key: str = ""
-    groq_extraction_model: str = "llama-3.3-70b-versatile"
-    groq_simple_model: str = "llama-3.1-8b-instant"
+    # NOTE: llama-3.3-70b-versatile / llama-3.1-8b-instant are no longer
+    # available on Groq accounts. These map to strong/complex (gpt-oss-120b)
+    # and simple/fast (gpt-oss-20b) models that are actually provisioned.
+    groq_extraction_model: str = "openai/gpt-oss-120b"
+    groq_simple_model: str = "openai/gpt-oss-20b"
 
     # Embeddings (modular provider; swap by changing embedding_provider/model)
     embedding_provider: str = "fastembed"

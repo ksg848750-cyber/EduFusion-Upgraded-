@@ -272,3 +272,266 @@ export async function submitAnswer(
   });
   return res.json();
 }
+
+// ---- Milestone 4: adaptive diagnostic reasoning ----
+
+export type DiagnosticStartResponse = {
+  status: string;
+  sessionId?: string | null;
+  conceptId?: string | null;
+  conceptName?: string | null;
+  questions?: TestQuestion[];
+  resolution?: Record<string, unknown> | null;
+  targetVocabulary?: string[];
+  error?: string | null;
+};
+
+export type DiagnosticAnswerResponse = {
+  answerId: string;
+  correct: boolean;
+  reasoningQuality: string;
+  explanation: string;
+  evidenceSignals: string[];
+  misconception: { category: string; statement: string; confidence: number } | null;
+};
+
+export type DiagnosticDecisionResponse = {
+  status: string;
+  rootCause?: string | null;
+  confidence: number;
+  statement: string;
+  evidenceSignals: string[];
+  hypotheses: { category: string; confidence: number }[];
+  needsProbe: boolean;
+  differentiationTarget?: { hypothesisA: string; hypothesisB: string } | null;
+};
+
+export type EvidenceBundleResponse = {
+  status: string;
+  conceptId?: string | null;
+  conceptName?: string | null;
+  resolution: Record<string, unknown>;
+  diagnosis: {
+    rootCause: string;
+    confidence: number;
+    resolution: Record<string, unknown>;
+    investigation: Record<string, unknown>;
+    evidenceReferences: unknown[];
+  } | null;
+  evidence: {
+    questionId: string;
+    questionText: string;
+    reasoning: string;
+    response: string;
+    correct: boolean;
+    reasoningQuality: string;
+    evidenceSignals: string[];
+    misconception: { category: string } | null;
+  }[];
+};
+
+export async function startDiagnostic(
+  subjectId: string,
+  conceptId?: string,
+): Promise<DiagnosticStartResponse> {
+  const res = await authedFetch(`/subjects/${subjectId}/diagnostic`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ conceptId: conceptId ?? null }),
+  });
+  return res.json();
+}
+
+export async function submitDiagnosticAnswer(
+  subjectId: string,
+  sessionId: string,
+  questionId: string,
+  response: string,
+  reasoning: string,
+  selectedOptionId?: string,
+): Promise<DiagnosticAnswerResponse> {
+  const res = await authedFetch(
+    `/subjects/${subjectId}/sessions/${sessionId}/diagnostic-answers`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ questionId, response, reasoning, selectedOptionId }),
+    },
+  );
+  return res.json();
+}
+
+export async function getDiagnosticDecision(
+  subjectId: string,
+  sessionId: string,
+): Promise<DiagnosticDecisionResponse> {
+  const res = await authedFetch(
+    `/subjects/${subjectId}/sessions/${sessionId}/diagnostic-decision`,
+  );
+  return res.json();
+}
+
+export async function getEvidenceBundle(
+  subjectId: string,
+  sessionId: string,
+): Promise<EvidenceBundleResponse> {
+  const res = await authedFetch(
+    `/subjects/${subjectId}/sessions/${sessionId}/evidence-bundle`,
+  );
+  return res.json();
+}
+
+export type ProbeStartResponse = {
+  status: string;
+  probeQuestion?: TestQuestion | null;
+  target?: { hypothesisA?: string; hypothesisB?: string } | null;
+  error?: string | null;
+};
+
+export type DiagnosisResponse = {
+  id: string;
+  conceptId: string;
+  conceptName: string;
+  rootCause: string;
+  confidence: number;
+  resolution: Record<string, unknown>;
+  investigation: Record<string, unknown>;
+  evidenceReferences: unknown[];
+};
+
+export async function startDiagnosticProbe(
+  subjectId: string,
+  sessionId: string,
+): Promise<ProbeStartResponse> {
+  const res = await authedFetch(
+    `/subjects/${subjectId}/sessions/${sessionId}/diagnostic-probe`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    },
+  );
+  return res.json();
+}
+
+export async function createFinalDiagnosis(
+  subjectId: string,
+  sessionId: string,
+): Promise<DiagnosisResponse> {
+  const res = await authedFetch(
+    `/subjects/${subjectId}/sessions/${sessionId}/diagnosis`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    },
+  );
+  return res.json();
+}
+
+// ---- Milestone 5: adaptive teaching engine (lesson delivery + clarify) ----
+
+export const INTERESTS = ["normal", "cricket", "movies", "anime", "gaming", "football"] as const;
+export type Interest = (typeof INTERESTS)[number];
+
+export type TeachingDecision = {
+  status: string;
+  lessonId?: string | null;
+  sessionId?: string | null;
+  diagnosisId?: string | null;
+  conceptId?: string | null;
+  conceptName?: string | null;
+  rootCause?: string | null;
+  action?: string | null;
+  reason?: string | null;
+  teachingStrategy?: string | null;
+  attempt: number;
+  excluded: string[];
+  interestContext: string;
+};
+
+export type AnalogyMapping = {
+  element: string;
+  mappedTo: string;
+  description: string;
+};
+
+export type InterestAnalogy = {
+  scene: string;
+  mapping: AnalogyMapping[];
+  analogy_works: string;
+  analogy_breaks: string;
+};
+
+export type LessonContent = {
+  status: string;
+  lessonId?: string | null;
+  conceptId?: string | null;
+  rootCause?: string | null;
+  teachingAction?: string | null;
+  teachingStrategy?: string | null;
+  attempt: number;
+  interestContext: string;
+  explanation: string;
+  keyPoints: string[];
+  analogy: InterestAnalogy | null;
+  sourceChunks: number[];
+  sourceReferences: { chunkIndex: number }[];
+};
+
+export type ClarifyResponse = {
+  status: string;
+  lessonId?: string | null;
+  conceptId?: string | null;
+  answer: string;
+  covered: boolean;
+  sourceChunks: number[];
+  disclaimer: string;
+};
+
+export async function createTeachingDecision(
+  subjectId: string,
+  sessionId: string,
+  interestContext: Interest = "normal",
+): Promise<TeachingDecision> {
+  const res = await authedFetch(`/subjects/${subjectId}/teaching-decision`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sessionId, interestContext }),
+  });
+  return res.json();
+}
+
+export async function generateLesson(
+  subjectId: string,
+  lessonId: string,
+  interestContext: Interest = "normal",
+): Promise<LessonContent> {
+  const res = await authedFetch(`/subjects/${subjectId}/lessons/${lessonId}/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ interestContext }),
+  });
+  return res.json();
+}
+
+export async function fetchLesson(
+  subjectId: string,
+  lessonId: string,
+): Promise<{ status: string; lesson: Record<string, unknown> }> {
+  const res = await authedFetch(`/subjects/${subjectId}/lessons/${lessonId}`);
+  return res.json();
+}
+
+export async function clarifyLessonDoubt(
+  subjectId: string,
+  lessonId: string,
+  question: string,
+): Promise<ClarifyResponse> {
+  const res = await authedFetch(`/subjects/${subjectId}/lessons/${lessonId}/clarify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }),
+  });
+  return res.json();
+}

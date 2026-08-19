@@ -7,16 +7,32 @@ from pydantic import BaseModel
 from app.ai.context_builder import build_extraction_context
 from app.ai.prompts.extraction import SYSTEM_PROMPT, build_extraction_user_prompt
 from app.ai.prompts.learner import (
+    DIAGNOSTIC_SYSTEM_PROMPT,
     EVALUATE_SYSTEM_PROMPT,
     EXPLAIN_SYSTEM_PROMPT,
+    PROBE_SYSTEM_PROMPT,
     TEST_SYSTEM_PROMPT,
+    build_diagnostic_user_prompt,
     build_evaluate_user_prompt,
     build_explain_user_prompt,
+    build_probe_user_prompt,
     build_test_user_prompt,
+)
+from app.ai.prompts.teaching import (
+    CLARIFY_SYSTEM_PROMPT,
+    LESSON_SYSTEM_PROMPT,
+    build_clarify_user_prompt,
+    build_lesson_user_prompt,
 )
 from app.ai.providers.base import BaseLLMProvider
 from app.ai.schemas.extraction import KnowledgeExtraction
-from app.ai.schemas.learner import AnswerEvaluation, ConceptExplanation, QuestionSet
+from app.ai.schemas.learner import (
+    AnswerEvaluation,
+    ConceptExplanation,
+    ProbeQuestion,
+    QuestionSet,
+)
+from app.ai.schemas.teaching import Clarification, GeneratedLesson
 from app.core.config import get_settings
 
 _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
@@ -143,6 +159,107 @@ class AIService:
             TEST_SYSTEM_PROMPT, user, QuestionSet, temperature=0.3
         )
 
+    async def generate_diagnostic_questions(
+        self,
+        concept: dict[str, Any],
+        target_vocabulary: list[str],
+        graph_position: str,
+        chunks: list[dict[str, Any]],
+        learner_context: str = "",
+        question_count: int = 5,
+    ) -> QuestionSet:
+        """Generate a focused diagnostic question set for a fixed concept.
+
+        The concept is fixed; only the supplied target vocabulary may be used in
+        diagnosticTargets (deterministic enforcement happens in the caller).
+        ``learner_context`` carries the learner's current state so questions adapt
+        to known gaps; empty means no prior assessment.
+        """
+        user = build_diagnostic_user_prompt(
+            concept_name=concept.get("name", ""),
+            description=concept.get("description", ""),
+            expected_understanding=concept.get("expectedUnderstanding", ""),
+            common_misconceptions=_list_text(concept.get("commonMisconceptions") or []),
+            target_vocabulary="; ".join(target_vocabulary),
+            graph_position=graph_position,
+            learner_context=learner_context,
+            source_chunks=_render_chunks(chunks),
+            question_count=question_count,
+        )
+        return await self._complete_validated(
+            DIAGNOSTIC_SYSTEM_PROMPT.format(question_count=question_count),
+            user,
+            QuestionSet,
+            temperature=0.3,
+        )
+
+    async def generate_probe(
+        self,
+        concept: dict[str, Any],
+        differentiation_target: dict,
+        target_vocabulary: list[str],
+        chunks: list[dict[str, Any]],
+    ) -> ProbeQuestion:
+        """Generate a single targeted probe to disambiguate two hypotheses."""
+        user = build_probe_user_prompt(
+            concept_name=concept.get("name", ""),
+            expected_understanding=concept.get("expectedUnderstanding", ""),
+            differentiation_target=_json_text(differentiation_target),
+            target_vocabulary="; ".join(target_vocabulary),
+            source_chunks=_render_chunks(chunks),
+        )
+        return await self._complete_validated(
+            PROBE_SYSTEM_PROMPT, user, ProbeQuestion, temperature=0.3
+        )
+
+    async def generate_lesson(
+        self,
+        concept: dict[str, Any],
+        root_cause: str,
+        teaching_action: str,
+        teaching_strategy: str,
+        interest: str,
+        chunks: list[dict[str, Any]],
+    ) -> GeneratedLesson:
+        """Generate a grounded, strategy-aware lesson for a diagnosed gap.
+
+        ``interest`` only alters the narrative analogy section; the technical
+        explanation stays concept-accurate. TARGETED_PROBING must never reach
+        this method (a probe replaces the lesson).
+        """
+        user = build_lesson_user_prompt(
+            concept_name=concept.get("name", ""),
+            root_cause=root_cause,
+            teaching_action=teaching_action,
+            teaching_strategy=teaching_strategy or "DIRECT_EXPLANATION",
+            interest=interest,
+            source_chunks=_render_chunks(chunks),
+        )
+        return await self._complete_validated(
+            LESSON_SYSTEM_PROMPT, user, GeneratedLesson, temperature=0.3
+        )
+
+    async def clarify_doubt(
+        self,
+        concept: dict[str, Any],
+        question: str,
+        chunks: list[dict[str, Any]],
+    ) -> Clarification:
+        """Answer a lesson doubt strictly from the retrieved chunks.
+
+        If the caller passed no chunks the hard RAG guard is enforced in the
+        service layer (covered=False), so the model is never asked with zero
+        grounding.
+        """
+        user = build_clarify_user_prompt(
+            concept_name=concept.get("name", ""),
+            question=question,
+            source_chunks=_render_chunks(chunks),
+        )
+        return await self._complete_validated(
+            CLARIFY_SYSTEM_PROMPT, user, Clarification, temperature=0.1
+        )
+
     async def evaluate_answer(
         self,
         concept: dict[str, Any],
@@ -177,3 +294,7 @@ class AIService:
 
 def _list_text(values: list[str]) -> str:
     return "; ".join(values) if values else "(none listed)"
+
+
+def _json_text(value: dict) -> str:
+    return json.dumps(value, ensure_ascii=False) if value else "{}"

@@ -129,6 +129,23 @@ async def get_learner_model(user_id: str, subject_id: str) -> dict[str, Any] | N
         }
 
 
+async def get_strategy_profile(user_id: str, subject_id: str) -> dict[str, Any]:
+    """Return the learner's strategy outcome history for a subject
+    ({concept_id: {strategy: outcome}}), defaulting to an empty map."""
+    async with connection() as conn:
+        if conn is None:
+            return {}
+        row = await conn.execute(
+            "SELECT strategy_profile FROM public.learner_models "
+            "WHERE user_id = %s AND subject_id = %s",
+            (user_id, subject_id),
+        )
+        record = await row.fetchone()
+        if record is None:
+            return {}
+        return record[0] or {}
+
+
 async def ensure_learner_model(user_id: str, subject_id: str) -> dict[str, Any]:
     existing = await get_learner_model(user_id, subject_id)
     if existing:

@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from typing import Any
 
+from psycopg.types.json import Jsonb
+
 from app.core.database import connection
 
 
@@ -8,17 +10,23 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-async def create_session(learner_id: str, subject_id: str, concept_id: str) -> dict[str, Any] | None:
+async def create_session(
+    learner_id: str,
+    subject_id: str,
+    concept_id: str,
+    resolution: dict | None = None,
+) -> dict[str, Any] | None:
     async with connection() as conn:
         if conn is None:
             return None
         row = await conn.execute(
             """
-            INSERT INTO public.diagnostic_sessions (learner_id, subject_id, concept_id, status)
-            VALUES (%s, %s, %s, 'CREATED')
-            RETURNING id, learner_id, subject_id, concept_id, status, started_at, completed_at, created_at, updated_at
+            INSERT INTO public.diagnostic_sessions (learner_id, subject_id, concept_id, status, resolution)
+            VALUES (%s, %s, %s, 'CREATED', %s)
+            RETURNING id, learner_id, subject_id, concept_id, status, resolution,
+                      started_at, completed_at, created_at, updated_at
             """,
-            (learner_id, subject_id, concept_id),
+            (learner_id, subject_id, concept_id, Jsonb(resolution or {})),
         )
         record = await row.fetchone()
         if record is None:
@@ -29,10 +37,11 @@ async def create_session(learner_id: str, subject_id: str, concept_id: str) -> d
             "subjectId": str(record[2]),
             "conceptId": str(record[3]),
             "status": record[4],
-            "startedAt": record[5].isoformat(),
-            "completedAt": record[6].isoformat() if record[6] else None,
-            "createdAt": record[7].isoformat(),
-            "updatedAt": record[8].isoformat(),
+            "resolution": record[5] or {},
+            "startedAt": record[6].isoformat(),
+            "completedAt": record[7].isoformat() if record[7] else None,
+            "createdAt": record[8].isoformat(),
+            "updatedAt": record[9].isoformat(),
         }
 
 
@@ -42,7 +51,8 @@ async def get_session(learner_id: str, session_id: str) -> dict[str, Any] | None
             return None
         row = await conn.execute(
             """
-            SELECT id, learner_id, subject_id, concept_id, status, started_at, completed_at, created_at, updated_at
+            SELECT id, learner_id, subject_id, concept_id, status, resolution,
+                   started_at, completed_at, created_at, updated_at
             FROM public.diagnostic_sessions
             WHERE id = %s AND learner_id = %s
             """,
@@ -57,11 +67,32 @@ async def get_session(learner_id: str, session_id: str) -> dict[str, Any] | None
             "subjectId": str(record[2]),
             "conceptId": str(record[3]),
             "status": record[4],
-            "startedAt": record[5].isoformat(),
-            "completedAt": record[6].isoformat() if record[6] else None,
-            "createdAt": record[7].isoformat(),
-            "updatedAt": record[8].isoformat(),
+            "resolution": record[5] or {},
+            "startedAt": record[6].isoformat(),
+            "completedAt": record[7].isoformat() if record[7] else None,
+            "createdAt": record[8].isoformat(),
+            "updatedAt": record[9].isoformat(),
         }
+
+
+async def mark_in_progress(learner_id: str, session_id: str) -> dict[str, Any] | None:
+    async with connection() as conn:
+        if conn is None:
+            return None
+        now = _now_iso()
+        row = await conn.execute(
+            """
+            UPDATE public.diagnostic_sessions
+            SET status = 'IN_PROGRESS', updated_at = %s
+            WHERE id = %s AND learner_id = %s AND status = 'CREATED'
+            RETURNING id, status
+            """,
+            (now, session_id, learner_id),
+        )
+        record = await row.fetchone()
+        if record is None:
+            return None
+        return {"id": str(record[0]), "status": record[1]}
 
 
 async def count_answered_in_session(learner_id: str, session_id: str, concept_id: str) -> int:

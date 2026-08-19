@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 
@@ -6,10 +6,8 @@ import type { Concept, ConceptLearner } from "@/lib/api";
 import {
   explainConcept,
   fetchConceptLearner,
-  startConceptTest,
-  submitAnswer,
-  TestQuestion,
 } from "@/lib/api";
+import ConceptTest from "@/components/concept-test";
 
 type Props = {
   subjectId: string;
@@ -33,12 +31,6 @@ export default function ConceptStudy({ subjectId, concept, mode, onClose, onMode
 
   const [explanation, setExplanation] = useState<Awaited<ReturnType<typeof explainConcept>>["explanation"] | null>(null);
   const [explaining, setExplaining] = useState(false);
-
-  const [test, setTest] = useState<{ sessionId: string; questions: TestQuestion[] } | null>(null);
-  const [questionIndex, setQuestionIndex] = useState(0);
-  const [startingTest, setStartingTest] = useState(false);
-  const [feedback, setFeedback] = useState<Awaited<ReturnType<typeof submitAnswer>> | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
   async function loadLearner() {
     try {
@@ -80,40 +72,6 @@ export default function ConceptStudy({ subjectId, concept, mode, onClose, onMode
       setExplaining(false);
     }
   }
-
-  async function handleStartTest() {
-    setStartingTest(true);
-    setError(null);
-    try {
-      const res = await startConceptTest(subjectId, concept.id);
-      setTest({ sessionId: res.sessionId, questions: res.questions });
-      setQuestionIndex(0);
-      setFeedback(null);
-      await loadLearner();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start the test");
-    } finally {
-      setStartingTest(false);
-    }
-  }
-
-  async function handleSubmitAnswer(response: string, reasoning: string, selectedOptionId?: string) {
-    if (!test) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      const q = test.questions[questionIndex];
-      const res = await submitAnswer(subjectId, test.sessionId, q.id, response, reasoning, selectedOptionId);
-      setFeedback(res);
-      await loadLearner();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not submit answer");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  const currentQuestion = test?.questions[questionIndex];
 
   return (
     <div className="pointer-events-auto fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm">
@@ -210,7 +168,7 @@ export default function ConceptStudy({ subjectId, concept, mode, onClose, onMode
                       <div key={m.id} className="rounded-lg bg-white p-2.5 text-sm dark:bg-zinc-950">
                         <p className="font-medium text-zinc-800 dark:text-zinc-200">{m.statement}</p>
                         <p className="mt-0.5 text-[11px] text-zinc-400">
-                          {m.status} · {m.category.replace(/_/g, " ").toLowerCase()} · confidence{" "}
+                          {m.status} Â· {m.category.replace(/_/g, " ").toLowerCase()} Â· confidence{" "}
                           {Math.round(m.confidence * 100)}%
                         </p>
                       </div>
@@ -287,224 +245,10 @@ export default function ConceptStudy({ subjectId, concept, mode, onClose, onMode
         )}
 
         {!loading && mode === "test" && (
-          <div className="mt-5 space-y-5">
-            {!test && (
-              <div className="rounded-xl border border-dashed border-zinc-300 p-6 text-center dark:border-zinc-700">
-                <p className="text-sm text-zinc-600 dark:text-zinc-300">
-                  Answer questions about this topic. EduFusion evaluates your reasoning — not just
-                  whether you are right — and updates your learner model.
-                </p>
-                <button
-                  onClick={handleStartTest}
-                  disabled={startingTest}
-                  className="mt-4 rounded-lg bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-300"
-                >
-                  {startingTest ? "Preparing questions…" : "Start test"}
-                </button>
-              </div>
-            )}
-
-            {test && currentQuestion && !feedback && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-zinc-500">
-                    Question {questionIndex + 1} of {test.questions.length}
-                  </p>
-                  <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                    {currentQuestion.questionType.replace(/_/g, " ").toLowerCase()} · difficulty{" "}
-                    {currentQuestion.difficulty}
-                  </span>
-                </div>
-                <QuestionForm
-                  question={currentQuestion}
-                  submitting={submitting}
-                  onSubmit={handleSubmitAnswer}
-                />
-              </div>
-            )}
-
-            {test && feedback && (
-              <div className="space-y-4">
-                <div
-                  className={`rounded-xl border p-4 ${
-                    feedback.correct
-                      ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950"
-                      : "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950"
-                  }`}
-                >
-                  <p
-                    className={`text-sm font-semibold ${
-                      feedback.correct
-                        ? "text-emerald-700 dark:text-emerald-200"
-                        : "text-red-700 dark:text-red-200"
-                    }`}
-                  >
-                    {feedback.correct ? "Correct" : "Not quite"}
-                    {feedback.reasoningQuality === "SOLID" && " — solid reasoning"}
-                    {feedback.reasoningQuality === "PARTIAL" && " — partial reasoning"}
-                    {feedback.reasoningQuality === "POOR" && " — weak reasoning"}
-                  </p>
-                  <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">{feedback.explanation}</p>
-                </div>
-
-                {feedback.misconception && (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-                    <p className="font-semibold">Suspected misconception</p>
-                    <p className="mt-1">{feedback.misconception.statement}</p>
-                    <p className="mt-0.5 text-[11px]">
-                      {feedback.misconception.status} · confidence{" "}
-                      {Math.round(feedback.misconception.confidence * 100)}%
-                    </p>
-                  </div>
-                )}
-
-                {learner && (
-                  <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                      Updated learner model
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-4 text-sm">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                          STATUS_STYLE[learner.state.status] ?? STATUS_STYLE.UNKNOWN
-                        }`}
-                      >
-                        {learner.state.status}
-                      </span>
-                      <span className="text-zinc-600 dark:text-zinc-300">
-                        Mastery {Math.round(learner.state.mastery * 100)}%
-                      </span>
-                      <span className="text-zinc-600 dark:text-zinc-300">
-                        Confidence {Math.round(learner.state.confidence * 100)}%
-                      </span>
-                      <span className="text-zinc-600 dark:text-zinc-300">
-                        {learner.state.interactionCount} interaction
-                        {learner.state.interactionCount === 1 ? "" : "s"}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex justify-end">
-                  {questionIndex < test.questions.length - 1 ? (
-                    <button
-                      onClick={() => {
-                        setQuestionIndex((i) => i + 1);
-                        setFeedback(null);
-                      }}
-                      className="rounded-lg bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-300"
-                    >
-                      Next question →
-                    </button>
-                  ) : (
-                    <button
-                      onClick={onClose}
-                      className="rounded-lg bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-300"
-                    >
-                      Done
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
+          <div className="mt-5">
+            <ConceptTest subjectId={subjectId} concept={concept} onClose={onClose} />
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-function QuestionForm({
-  question,
-  submitting,
-  onSubmit,
-}: {
-  question: TestQuestion;
-  submitting: boolean;
-  onSubmit: (response: string, reasoning: string, selectedOptionId?: string) => void;
-}) {
-  const isMcq = question.questionType === "MCQ" && question.options.length > 0;
-  const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
-  const [response, setResponse] = useState("");
-  const [reasoning, setReasoning] = useState("");
-
-  const canSubmit = isMcq ? selectedOptionId !== null : response.trim().length > 0;
-
-  return (
-    <div className="space-y-4">
-      <p className="text-base font-medium text-black dark:text-zinc-50">{question.questionText}</p>
-
-      {isMcq ? (
-        <div role="radiogroup" aria-label="Choose one answer" className="space-y-2">
-          {question.options.map((option) => {
-            const isSelected = selectedOptionId === option.id;
-            return (
-              <button
-                key={option.id}
-                role="radio"
-                aria-checked={isSelected}
-                onClick={() => setSelectedOptionId(option.id)}
-                className={`flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left text-sm transition-colors ${
-                  isSelected
-                    ? "border-teal-600 bg-teal-50 ring-2 ring-teal-500/30 dark:border-teal-400 dark:bg-teal-950"
-                    : "border-zinc-300 bg-white hover:border-teal-500 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800"
-                }`}
-              >
-                <span
-                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-                    isSelected
-                      ? "border-teal-600 bg-teal-600 dark:border-teal-400 dark:bg-teal-400"
-                      : "border-zinc-400 dark:border-zinc-500"
-                  }`}
-                >
-                  {isSelected && (
-                    <span className="h-2 w-2 rounded-full bg-white dark:bg-black" />
-                  )}
-                </span>
-                <span className="font-medium text-zinc-800 dark:text-zinc-100">
-                  <span className="mr-1.5 inline-block w-4 text-zinc-400">{option.id}</span>
-                  {option.text}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      ) : (
-        <textarea
-          value={response}
-          onChange={(e) => setResponse(e.target.value)}
-          rows={3}
-          placeholder="Your answer…"
-          className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-        />
-      )}
-
-      <div>
-        <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-          {isMcq
-            ? "Why did you choose this answer?"
-            : "Explain your reasoning (helps EduFusion diagnose)"}
-        </label>
-        <textarea
-          value={reasoning}
-          onChange={(e) => setReasoning(e.target.value)}
-          rows={2}
-          placeholder="Why did you answer that way?"
-          className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-        />
-      </div>
-      <div className="flex justify-end">
-        <button
-          onClick={() =>
-            isMcq
-              ? onSubmit("", reasoning, selectedOptionId ?? undefined)
-              : onSubmit(response, reasoning)
-          }
-          disabled={submitting || !canSubmit}
-          className="rounded-lg bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-black dark:hover:bg-zinc-300"
-        >
-          {submitting ? "Evaluating…" : "Submit answer"}
-        </button>
       </div>
     </div>
   );

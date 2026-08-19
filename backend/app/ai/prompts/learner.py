@@ -74,6 +74,132 @@ TEST_USER_TEMPLATE = (
 )
 
 
+DIAGNOSTIC_SYSTEM_PROMPT = (
+    "You are an expert diagnostic assessment designer. You write a focused set "
+    "of diagnostic questions that uncover WHY a student struggles with ONE "
+    "concept from their uploaded learning material.\n\n"
+    "RULES:\n"
+    "- The concept to probe is FIXED and given. Do not substitute another concept.\n"
+    "- Write exactly {question_count} questions, grounding each in the provided "
+    "source chunks. Never test material absent from the document.\n"
+    "- DEFAULT TO MCQ: prefer MCQ with 4 distinct, mutually exclusive options and "
+    "exactly one correct option referenced by correctOptionId. Use SCENARIO "
+    "(novel wording/context) and SHORT_ANSWER only where a concept genuinely "
+    "cannot be probed with an MCQ.\n"
+    "- Target vocabulary is supplied. Every question must target ONE of the "
+    "supplied tags via diagnosticTargets. Do not invent tags outside that list.\n"
+    "- Questions must uncover the mechanism/mental model, not just definitions. "
+    "Make them progressively diagnostic so wrong answers reveal WHERE reasoning "
+    "breaks.\n"
+    "- Use the supplied learner context to FOCUS on the learner's known gaps. If "
+    "a prior diagnosis or weak concept state is given, target the specific gap; "
+    "if none is given, probe the concept broadly across its targets.\n"
+    "- Do NOT reuse the exact source sentence as a question. Do not leak the "
+    "answer in the stem.\n"
+    "- expectedAnswer is the correct answer; expectedReasoning the correct "
+    "reasoning path.\n"
+    "- Return ONLY valid JSON matching the schema. No markdown fences."
+)
+
+DIAGNOSTIC_USER_TEMPLATE = (
+    "CONCEPT TO DIAGNOSE (fixed): {concept_name}\n"
+    "DESCRIPTION: {description}\n"
+    "EXPECTED UNDERSTANDING: {expected_understanding}\n"
+    "COMMON MISCONCEPTIONS: {common_misconceptions}\n\n"
+    "TARGET VOCABULARY (diagnosticTargets must be drawn ONLY from these):\n"
+    "{target_vocabulary}\n\n"
+    "LEARNER CONTEXT:\n{learner_context}\n\n"
+    "GRAPH POSITION:\n{graph_position}\n\n"
+    "SOURCE CHUNKS (indexed):\n{source_chunks}\n\n"
+    'Return a JSON object: {{"questions":[{{"questionText":"","questionType":"MCQ|'
+    'SCENARIO|SHORT_ANSWER","difficulty":3,"expectedAnswer":"","expectedReasoning":"",'
+    '"diagnosticTargets":[],"sourceChunks":[],'
+    '"options":[{{"id":"A","text":""}}],"correctOptionId":"A"}}]}}\n'
+    "Exactly {question_count} questions. questionType must be one of MCQ, SCENARIO, "
+    "SHORT_ANSWER. Prefer MCQ. For MCQ, options must have at least 2 entries (4 is "
+    "ideal) and correctOptionId must reference exactly one option id. For "
+    "SCENARIO/SHORT_ANSWER leave options empty and correctOptionId empty. "
+    "sourceChunks must reference the chunk indices above. Every question's "
+    "diagnosticTargets must contain exactly one tag from the target vocabulary."
+)
+
+PROBE_SYSTEM_PROMPT = (
+    "You are an expert diagnostic tutor designing ONE targeted probe question. "
+    "The student's earlier answers were ambiguous between two competing root "
+    "causes. Your probe must disambiguate them by constructing a novel scenario "
+    "in which the two hypotheses predict DIFFERENT outcomes.\n\n"
+    "RULES:\n"
+    "- Write exactly ONE question, grounded in the provided source chunks.\n"
+    "- The probe must distinguish Hypothesis A from Hypothesis B: design it so "
+    "the student's reasoning reveals which of the two is operating.\n"
+    "- DEFAULT TO MCQ with 4 distinct options and one correct option referenced "
+    "by correctOptionId; SCENARIO/SHORT_ANSWER only if MCQ cannot disambiguate.\n"
+    "- diagnosticTargets must contain exactly one tag from the target vocabulary "
+    "that best captures the disambiguation.\n"
+    "- differentiationTarget must echo the provided hypothesisA/hypothesisB.\n"
+    "- Do not reuse the exact source sentence or any earlier question verbatim.\n"
+    "- Return ONLY valid JSON matching the schema. No markdown fences."
+)
+
+PROBE_USER_TEMPLATE = (
+    "CONCEPT: {concept_name}\n"
+    "EXPECTED UNDERSTANDING: {expected_understanding}\n\n"
+    "DIFFERENTIATION TARGET:\n{differentiation_target}\n\n"
+    "TARGET VOCABULARY (diagnosticTargets drawn ONLY from these):\n{target_vocabulary}\n\n"
+    "SOURCE CHUNKS (indexed):\n{source_chunks}\n\n"
+    'Return a JSON object: {{"questionText":"","questionType":"MCQ|SCENARIO|'
+    'SHORT_ANSWER","difficulty":3,"expectedAnswer":"","expectedReasoning":"",'
+    '"diagnosticTargets":[],"sourceChunks":[],'
+    '"options":[{{"id":"A","text":""}}],"correctOptionId":"A",'
+    '"differentiationTarget":{{"hypothesisA":"","hypothesisB":""}}}}\n'
+    "questionType must be one of MCQ, SCENARIO, SHORT_ANSWER. Prefer MCQ. For MCQ, "
+    "options must have at least 2 entries (4 is ideal) and correctOptionId must "
+    "reference exactly one option id. For SCENARIO/SHORT_ANSWER leave options empty "
+    "and correctOptionId empty. sourceChunks must reference the chunk indices above. "
+    "diagnosticTargets must contain exactly one tag from the target vocabulary."
+)
+
+
+def build_diagnostic_user_prompt(
+    concept_name: str,
+    description: str,
+    expected_understanding: str,
+    common_misconceptions: str,
+    target_vocabulary: str,
+    graph_position: str,
+    source_chunks: str,
+    learner_context: str = "No learner state supplied.",
+    question_count: int = 5,
+) -> str:
+    return DIAGNOSTIC_USER_TEMPLATE.format(
+        concept_name=concept_name,
+        description=description,
+        expected_understanding=expected_understanding,
+        common_misconceptions=common_misconceptions,
+        target_vocabulary=target_vocabulary,
+        graph_position=graph_position,
+        learner_context=learner_context,
+        source_chunks=source_chunks,
+        question_count=question_count,
+    )
+
+
+def build_probe_user_prompt(
+    concept_name: str,
+    expected_understanding: str,
+    differentiation_target: str,
+    target_vocabulary: str,
+    source_chunks: str,
+) -> str:
+    return PROBE_USER_TEMPLATE.format(
+        concept_name=concept_name,
+        expected_understanding=expected_understanding,
+        differentiation_target=differentiation_target,
+        target_vocabulary=target_vocabulary,
+        source_chunks=source_chunks,
+    )
+
+
 EVALUATE_SYSTEM_PROMPT = (
     "You are an expert educational evaluator. You judge a student's answer AND "
     "their stated reasoning for one concept question from their own learning "
