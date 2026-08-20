@@ -431,7 +431,17 @@ export async function createFinalDiagnosis(
 
 // ---- Milestone 5: adaptive teaching engine (lesson delivery + clarify) ----
 
-export const INTERESTS = ["normal", "cricket", "movies", "anime", "gaming", "football"] as const;
+export const INTERESTS = [
+  "normal",
+  "cricket",
+  "movies",
+  "f1",
+  "gaming",
+  "anime",
+  "football",
+  "web-series",
+  "music",
+] as const;
 export type Interest = (typeof INTERESTS)[number];
 
 export type TeachingDecision = {

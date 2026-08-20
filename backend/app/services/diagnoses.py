@@ -63,6 +63,42 @@ async def get_diagnosis_by_session(learner_id: str, session_id: str) -> dict[str
         return _row(record) if record else None
 
 
+async def get_diagnosis_by_id(learner_id: str, diagnosis_id: str) -> dict[str, Any] | None:
+    async with connection() as conn:
+        if conn is None:
+            return None
+        row = await conn.execute(
+            """
+            SELECT id, learner_id, subject_id, session_id, concept_id, root_cause,
+                   confidence, status, resolution, investigation, evidence_references,
+                   created_at, updated_at
+            FROM public.diagnoses
+            WHERE learner_id = %s AND id = %s
+            """,
+            (learner_id, diagnosis_id),
+        )
+        record = await row.fetchone()
+        return _row(record) if record else None
+
+
+async def get_diagnosis_by_id(learner_id: str, diagnosis_id: str) -> dict[str, Any] | None:
+    async with connection() as conn:
+        if conn is None:
+            return None
+        row = await conn.execute(
+            """
+            SELECT id, learner_id, subject_id, session_id, concept_id, root_cause,
+                   confidence, status, resolution, investigation, evidence_references,
+                   created_at, updated_at
+            FROM public.diagnoses
+            WHERE learner_id = %s AND id = %s
+            """,
+            (learner_id, diagnosis_id),
+        )
+        record = await row.fetchone()
+        return _row(record) if record else None
+
+
 async def list_diagnoses(learner_id: str, subject_id: str) -> list[dict[str, Any]]:
     async with connection() as conn:
         if conn is None:

@@ -253,6 +253,55 @@ async def start_diagnostic(
     }
 
 
+_DOC_META_PATTERNS = [
+    re.compile(r"\bsection\s+heading", re.IGNORECASE),
+    re.compile(r"\bheading[s]?\b", re.IGNORECASE),
+    re.compile(r"\b(?:not\s+)?listed\b", re.IGNORECASE),
+    re.compile(r"\bpage\s+(?:number|no\.?|#|heading)", re.IGNORECASE),
+    re.compile(r"\btable\s+of\s+contents\b", re.IGNORECASE),
+    re.compile(r"\b(?:figure|chart|diagram|table)\b", re.IGNORECASE),
+    re.compile(r"\bchapter\b", re.IGNORECASE),
+    re.compile(r"\bmentioned\s+(?:in|on)\b", re.IGNORECASE),
+    re.compile(r"\bappears?\s+(?:in|on|as)\b", re.IGNORECASE),
+    re.compile(r"\bsection\s+\w+", re.IGNORECASE),
+    re.compile(r"\btitle\s+of\b", re.IGNORECASE),
+    re.compile(r"\bexcerpt[s]?\b", re.IGNORECASE),
+    re.compile(r"\b(?:topic|subject)\s+of\s+(?:the\s+)?(?:chapter|section|unit)\b", re.IGNORECASE),
+]
+
+
+def _question_text(q: Any) -> str:
+    """Collect all question content that should be inspected for meta-language."""
+    parts = [q.questionText, q.expectedAnswer, q.expectedReasoning]
+    for opt in getattr(q, "options", None) or []:
+        parts.append(getattr(opt, "text", ""))
+    return "\n".join(p for p in parts if p)
+
+
+def _is_document_meta_question(q: Any) -> bool:
+    """Return True when the question is about document structure rather than the
+    concept's mechanism (headings, sections, pages, figures, citations)."""
+    text = _question_text(q)
+    return any(pattern.search(text) for pattern in _DOC_META_PATTERNS)
+
+
+_TARGET_PREFIXES = {"understanding", "mc", "core"}
+
+
+def _ties_to_target(q: Any, vocab_set: set[str]) -> bool:
+    """Return True when at least one diagnostic target term actually appears in
+    the question's content, so the question genuinely probes that mechanism."""
+    text = _question_text(q)
+    lowered = text.lower()
+    for target in q.diagnosticTargets:
+        tokens = [t for t in target.lower().split("_") if t and t not in _TARGET_PREFIXES]
+        if not tokens:
+            continue
+        if any(token in lowered for token in tokens):
+            return True
+    return False
+
+
 def _validate_diagnostic_questions(
     questions: list[Any],
     vocab: list[str],
@@ -263,7 +312,8 @@ def _validate_diagnostic_questions(
 
     Returns (valid_questions, error_messages). All constraints are enforced here
     and are never left to the LLM: exact target tags, grounded chunk indices,
-    valid MCQ shape, and count bounds.
+    valid MCQ shape, count bounds, and mechanism-based content (no document-meta
+    questions, no untethered diagnostic targets).
     """
     if not questions:
         return [], ["No questions generated."]
@@ -285,6 +335,18 @@ def _validate_diagnostic_questions(
             if len(q.options) < 2:
                 errors.append(f"Question {idx + 1} MCQ has fewer than 2 options.")
                 continue
+        if _is_document_meta_question(q):
+            errors.append(
+                f"Question {idx + 1} is a document-meta question, not a mechanism "
+                "question (headings/pages/sections), and was rejected."
+            )
+            continue
+        if not _ties_to_target(q, vocab_set):
+            errors.append(
+                f"Question {idx + 1} does not reference any of its diagnostic "
+                "targets and was rejected as off-topic."
+            )
+            continue
         valid.append(q)
     return valid, errors
 

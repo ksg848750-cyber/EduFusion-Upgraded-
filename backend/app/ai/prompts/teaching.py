@@ -19,13 +19,37 @@ LESSON_SYSTEM_PROMPT = (
     "explanation, etc.).\n"
     "- The lesson must correct the ROOT CAUSE explicitly (e.g. counterexample "
     "for a misconception, repair for a missing prerequisite).\n"
-    "- If an INTEREST lens is provided, produce an analogy narrative section. "
-    "The interest changes NARRATIVE TEXT ONLY: the technical explanation must "
-    "remain accurate. Use a REAL, verifiable reference from the interest domain "
-    "(an actual film scene, match, game mechanic) - never a generic fictional "
-    "\"imagine a team\". If you are not confident a reference is real, use a "
-    "simpler real one. Be honest in analogy_works and analogy_breaks about "
-    "where the analogy fits and where it falls short.\n"
+    "- COVER THE FULL TOPIC: the lesson must explain the ENTIRE concept/topic as "
+    "presented in the material, not only the diagnosed gap. Every related "
+    "sub-concept or sibling topic listed in TOPIC CONTEXT must be explained so "
+    "the student leaves with the complete picture and no missing pieces. But "
+    "DEPTH MUST VARY: press much harder on the DIAGNOSED ROOT CAUSE and the "
+    "STUDENT'S WEAK AREAS - give them the deepest treatment (counterexample, "
+    "step-by-step mechanism, worked example, why-the-common-mistake-happens). "
+    "Cover the rest of the topic solidly but more briefly, explicitly pointing "
+    "out how each other part differs from the weak area so nothing is confused "
+    "with it.\n"
+    "- USE THE STUDENT'S ANSWERS: the lesson receives the student's actual "
+    "answers from the diagnostic, including which options they chose and their "
+    "reasoning. Use them: if the student chose an option belonging to a "
+    "DIFFERENT sub-concept and got it wrong, that is evidence they are weak in "
+    "that chosen sub-concept too - name it explicitly and explain how it "
+    "differs from the diagnosed one so the confusion is resolved. If their "
+    "reasoning reveals a specific mental model, address that model directly.\n"
+    "- If an INTEREST lens is provided, write the lesson AS an unfolding real "
+    "scene from the interest domain. The explanation itself should be told "
+    "through the scene: each step of the mechanism maps to an event in the real "
+    "moment as it happens, so the concept reads like a story, not a list of "
+    "facts. Use a REAL, verifiable reference for the chosen lens: cricket (a "
+    "real match with real players/overs), movies (a real film scene), f1 (a "
+    "real race or strategy call), gaming (a real game mechanic), anime (a real "
+    "episode or fight), football (a real match or moment), web-series (a real "
+    "show scene or episode), music (a real song, album, or artist). Never a "
+    "generic fictional \"imagine a team\". If you are not confident a reference "
+    "is real, use a simpler real one. The interest changes NARRATIVE TEXT ONLY: "
+    "the technical mechanism must remain accurate. Also fill the analogy object "
+    "with the explicit element->mappedTo mapping and be honest in analogy_works "
+    "and analogy_breaks about where the analogy fits and where it falls short.\n"
     "- Keep the tone student-friendly and progressive (what -> why -> how).\n"
     "- sourceChunks must be integers drawn from the provided chunk indices. "
     "Every claim must be traceable to a shown chunk.\n"
@@ -41,6 +65,8 @@ def build_lesson_user_prompt(
     teaching_strategy: str,
     interest: str,
     source_chunks: str,
+    topic_context: str = "",
+    student_answers: str = "",
 ) -> str:
     return (
         "CONCEPT TO TEACH: {concept_name}\n"
@@ -48,6 +74,10 @@ def build_lesson_user_prompt(
         "TEACHING ACTION: {teaching_action}\n"
         "TEACHING STRATEGY: {teaching_strategy}\n"
         "INTEREST LENS: {interest}\n\n"
+        "TOPIC CONTEXT (related concepts that are part of this same topic):\n"
+        "{topic_context}\n\n"
+        "STUDENT'S DIAGNOSTIC ANSWERS (their actual choices and reasoning):\n"
+        "{student_answers}\n\n"
         "SOURCE CHUNKS (indexed):\n{source_chunks}\n\n"
         'Return a JSON object: {{"explanation":"","keyPoints":[],'
         '"analogy":{{"scene":"","mapping":[{{"element":"","mappedTo":"",'
@@ -61,6 +91,8 @@ def build_lesson_user_prompt(
         teaching_action=teaching_action,
         teaching_strategy=teaching_strategy,
         interest=interest,
+        topic_context=topic_context or "(no additional context supplied)",
+        student_answers=student_answers or "(no diagnostic answers supplied)",
         source_chunks=source_chunks,
     )
 

@@ -16,7 +16,9 @@ class GroqAdapter(BaseLLMProvider):
         self._model = model
         self._client = AsyncGroq(api_key=api_key)
 
-    async def complete(self, system: str, user: str, temperature: float = 0.0) -> str:
+    async def complete(
+        self, system: str, user: str, temperature: float = 0.0, max_tokens: int | None = None
+    ) -> str:
         response = await self._client.chat.completions.create(
             model=self._model,
             messages=[
@@ -24,6 +26,7 @@ class GroqAdapter(BaseLLMProvider):
                 {"role": "user", "content": user},
             ],
             temperature=temperature,
+            **({"max_tokens": max_tokens} if max_tokens else {}),
         )
         if not response.choices:
             raise RuntimeError("Groq returned no completions")

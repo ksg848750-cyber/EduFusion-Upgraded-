@@ -20,7 +20,10 @@ from psycopg.types.json import Jsonb
 
 from app.core.database import connection
 
-ALLOWED_INTERESTS = ("normal", "cricket", "movies", "anime", "gaming", "football")
+ALLOWED_INTERESTS = (
+    "normal", "cricket", "movies", "f1", "gaming", "anime",
+    "football", "web-series", "music",
+)
 
 ROOT_CAUSE_ACTIONS: dict[str, tuple[str, str]] = {
     "MISSING_PREREQUISITE": (
@@ -351,6 +354,8 @@ async def generate_lesson_content(
     """
     from app.ai.service import AIService
     from app.services import concepts as concepts_service
+    from app.services import diagnoses as diagnoses_service
+    from app.services import answers as answers_service
     from app.services.concept_context import get_concept_chunks
 
     interest_context = _validate_interest(interest_context)
@@ -370,6 +375,33 @@ async def generate_lesson_content(
         return {"status": "CONCEPT_NOT_FOUND", "lessonId": lesson_id}
 
     chunks = await get_concept_chunks(owner_id, subject_id, concept)
+
+    concepts = await concepts_service.list_concepts(subject_id)
+    topic_names = [c.get("name") for c in concepts if c.get("name")]
+    topic_context = (
+        "Related concepts in this subject: " + ", ".join(topic_names)
+        if topic_names
+        else ""
+    )
+
+    student_answers = ""
+    diagnosis = await diagnoses_service.get_diagnosis_by_id(
+        owner_id, lesson["diagnosisId"]
+    ) if lesson.get("diagnosisId") else None
+    if diagnosis:
+        answers = await answers_service.list_answers_for_session(
+            owner_id, diagnosis["sessionId"]
+        )
+        lines = []
+        for a in answers:
+            flag = "correct" if a["correctness"] else "WRONG"
+            chosen = a.get("selectedOptionId") or a.get("response") or ""
+            lines.append(
+                f"- {flag}; chose: {chosen}; reasoning: {(a.get('reasoning') or '')[:400]}"
+            )
+        if lines:
+            student_answers = "\n".join(lines)
+
     service = ai or AIService()
     generated = await service.generate_lesson(
         concept,
@@ -378,6 +410,8 @@ async def generate_lesson_content(
         teaching_strategy=lesson["teachingStrategy"],
         interest=interest_context,
         chunks=chunks,
+        topic_context=topic_context,
+        student_answers=student_answers,
     )
 
     available = {c["chunkIndex"] for c in chunks}

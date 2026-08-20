@@ -18,7 +18,7 @@ class FakeProvider:
     def __init__(self, responses):
         self.responses = list(responses)
 
-    async def complete(self, system, user, temperature=0.0):
+    async def complete(self, system, user, temperature=0.0, max_tokens=None):
         return self.responses.pop(0)
 
 

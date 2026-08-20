@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 from typing import Any, TypeVar
@@ -42,6 +43,13 @@ _T = TypeVar("_T", bound=BaseModel)
 
 def _clean_json(text: str) -> str:
     return _FENCE.sub("", text).strip()
+
+
+def _is_rate_limit(exc: Exception) -> bool:
+    """Detect provider rate-limit errors (HTTP 429) across error types."""
+    if "429" in str(exc) or "rate limit" in str(exc).lower():
+        return True
+    return hasattr(exc, "status_code") and exc.status_code == 429
 
 
 def _render_chunks(chunks: list[dict[str, Any]]) -> str:
@@ -105,21 +113,29 @@ class AIService:
         *,
         temperature: float = 0.0,
         attempts: int = 2,
+        max_tokens: int | None = None,
+        rate_limit_backoff: float = 5.0,
     ) -> _T:
         """Run a completion, parse JSON, and validate against a Pydantic schema.
 
         Retries on invalid JSON/schema failures so transient formatting issues
-        never bubble up to the user as raw errors.
+        never bubble up to the user as raw errors. When a call fails due to a
+        provider rate limit (HTTP 429), it waits ``rate_limit_backoff`` seconds
+        before retrying so the limit can reset rather than failing the request.
         """
         provider = self._get_provider()
         last_error: Exception | None = None
         for _attempt in range(attempts):
             try:
-                raw = await provider.complete(system, user, temperature=temperature)
+                raw = await provider.complete(
+                    system, user, temperature=temperature, max_tokens=max_tokens
+                )
                 parsed = json.loads(_clean_json(raw))
                 return schema.model_validate(parsed)
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
+                if _is_rate_limit(exc) and _attempt < attempts - 1:
+                    await asyncio.sleep(rate_limit_backoff)
         raise RuntimeError(f"LLM call failed after retries: {last_error}") from last_error
 
     async def explain_concept(
@@ -220,12 +236,18 @@ class AIService:
         teaching_strategy: str,
         interest: str,
         chunks: list[dict[str, Any]],
+        topic_context: str = "",
+        student_answers: str = "",
     ) -> GeneratedLesson:
         """Generate a grounded, strategy-aware lesson for a diagnosed gap.
 
-        ``interest`` only alters the narrative analogy section; the technical
-        explanation stays concept-accurate. TARGETED_PROBING must never reach
-        this method (a probe replaces the lesson).
+        ``topic_context`` lists the sibling/related concepts of the same topic so
+        the lesson can cover the full picture. ``student_answers`` carries the
+        learner's actual diagnostic choices and reasoning so the lesson presses
+        on their weak areas and names confusion with other sub-concepts. The
+        interest lens only alters the narrative; the technical explanation stays
+        concept-accurate. TARGETED_PROBING must never reach this method (a probe
+        replaces the lesson).
         """
         user = build_lesson_user_prompt(
             concept_name=concept.get("name", ""),
@@ -234,9 +256,12 @@ class AIService:
             teaching_strategy=teaching_strategy or "DIRECT_EXPLANATION",
             interest=interest,
             source_chunks=_render_chunks(chunks),
+            topic_context=topic_context,
+            student_answers=student_answers,
         )
         return await self._complete_validated(
-            LESSON_SYSTEM_PROMPT, user, GeneratedLesson, temperature=0.3
+            LESSON_SYSTEM_PROMPT, user, GeneratedLesson, temperature=0.3,
+            max_tokens=2000, attempts=3,
         )
 
     async def clarify_doubt(

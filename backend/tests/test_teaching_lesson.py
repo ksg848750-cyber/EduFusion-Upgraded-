@@ -165,6 +165,64 @@ def test_generate_lesson_content_not_found(monkeypatch):
     assert result["status"] == "LESSON_NOT_FOUND"
 
 
+def test_generate_lesson_content_passes_topic_and_answers(monkeypatch):
+    """The lesson prompt must receive the full topic context and the student's
+    diagnostic answers so it can cover the whole topic while pressing on weak
+    areas and naming confusion with other sub-concepts."""
+    from app.ai.schemas.teaching import GeneratedLesson
+    from app.services import teaching as teaching_service
+    from app.services import answers as answers_service
+    from app.services import diagnoses as diagnoses_service
+    from app.services import learning_events as events_service
+
+    _lesson_deps(monkeypatch)
+    _patch_chunks(monkeypatch)
+
+    async def fake_save(owner, lid, explanation, refs, interest):
+        return {"id": lid, "updatedAt": "now"}
+
+    async def fake_event(*a, **k):
+        return None
+
+    monkeypatch.setattr(teaching_service, "_save_lesson_content", fake_save)
+    monkeypatch.setattr(events_service, "append_event", fake_event)
+
+    captured = {}
+
+    class _CaptureAI(_FakeAI):
+        async def generate_lesson(self, concept, **kwargs):
+            captured.update(kwargs)
+            return GeneratedLesson(
+                explanation="Full topic lesson.",
+                keyPoints=[],
+                analogy=None,
+                sourceChunks=[1],
+            )
+
+    async def fake_diagnosis(owner, diag_id):
+        return {"id": diag_id, "sessionId": "session-1"}
+
+    async def fake_answers(owner, session_id):
+        return [
+            {"correctness": False, "selectedOptionId": "SSTF",
+             "reasoning": "pick the shortest seek first", "response": ""},
+            {"correctness": True, "selectedOptionId": "FCFS",
+             "reasoning": "queue order", "response": ""},
+        ]
+
+    monkeypatch.setattr(diagnoses_service, "get_diagnosis_by_id", fake_diagnosis)
+    monkeypatch.setattr(answers_service, "list_answers_for_session", fake_answers)
+
+    result = _run(teaching_service.generate_lesson_content(
+        OWNER, SUBJECT, LESSON, interest_context="normal", ai=_CaptureAI(None, None)
+    ))
+
+    assert result["status"] == "OK"
+    assert "Forwarding" in captured["topic_context"]
+    assert "WRONG" in captured["student_answers"]
+    assert "SSTF" in captured["student_answers"]
+
+
 # ---- clarify_doubt ----------------------------------------------------------
 
 def test_clarify_ok(monkeypatch):

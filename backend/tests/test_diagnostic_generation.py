@@ -26,7 +26,7 @@ class FakeProvider:
     def __init__(self, responses):
         self.responses = list(responses)
 
-    async def complete(self, system, user, temperature=0.0):
+    async def complete(self, system, user, temperature=0.0, max_tokens=None):
         return self.responses.pop(0)
 
 
@@ -133,6 +133,42 @@ def test_validation_rejects_too_many_questions():
     assert errors
 
 
+def test_validation_rejects_document_meta_question():
+    from app.ai.schemas.learner import GeneratedQuestion
+
+    vocab = derive_target_vocabulary(_concept())
+    q = _question(
+        targets=[vocab[0]],
+        question_type="MCQ",
+    )
+    q["questionText"] = "Which of the following is NOT a section heading in the excerpts?"
+    q["options"] = [{"id": "A", "text": "Sequential Access"},
+                    {"id": "B", "text": "Direct Access"},
+                    {"id": "C", "text": "Other Access methods"},
+                    {"id": "D", "text": "Random Access"}]
+    q["correctOptionId"] = "D"
+    valid, errors = _validate_diagnostic_questions(
+        [GeneratedQuestion.model_validate(q)], vocab, {1}, 5
+    )
+    assert not valid
+    assert any("document-meta" in e for e in errors)
+
+
+def test_validation_rejects_off_topic_untethered_question():
+    from app.ai.schemas.learner import GeneratedQuestion
+
+    vocab = derive_target_vocabulary(_concept())
+    q = _question(targets=[vocab[0]], question_type="MCQ")
+    q["questionText"] = "Which colour best represents the idea of time?"
+    q["expectedAnswer"] = "blue"
+    q["expectedReasoning"] = "colour is unrelated to the concept"
+    valid, errors = _validate_diagnostic_questions(
+        [GeneratedQuestion.model_validate(q)], vocab, {1}, 5
+    )
+    assert not valid
+    assert any("off-topic" in e for e in errors)
+
+
 # ---- learner context ----------------------------------------------------------
 
 def test_build_learner_context_no_assessment(monkeypatch):
@@ -187,10 +223,10 @@ class _CaptureProvider(FakeProvider):
         super().__init__(responses)
         self.responses_capture = {}
 
-    async def complete(self, system, user, temperature=0.0):
+    async def complete(self, system, user, temperature=0.0, max_tokens=None):
         self.responses_capture["system"] = system
         self.responses_capture["user"] = user
-        return await super().complete(system, user, temperature)
+        return await super().complete(system, user, temperature, max_tokens=max_tokens)
 
 
 def test_generate_probe_parses_and_validates():

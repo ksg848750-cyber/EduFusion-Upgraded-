@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { Concept, LessonContent } from "@/lib/api";
 import {
@@ -22,9 +22,12 @@ const INTEREST_LABEL: Record<Interest, string> = {
   normal: "Plain",
   cricket: "Cricket",
   movies: "Movies",
-  anime: "Anime",
+  f1: "F1",
   gaming: "Gaming",
+  anime: "Anime",
   football: "Football",
+  "web-series": "Web Series",
+  music: "Music",
 };
 
 export default function Lesson({ subjectId, sessionId, concept, onClose }: Props) {
@@ -60,6 +63,11 @@ export default function Lesson({ subjectId, sessionId, concept, onClose }: Props
     if (next === interest) return;
     await loadLesson(next);
   }
+
+  useEffect(() => {
+    loadLesson("normal");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleClarify() {
     if (!question.trim() || !lesson?.lessonId) return;

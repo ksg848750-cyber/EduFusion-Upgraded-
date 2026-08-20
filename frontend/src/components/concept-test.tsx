@@ -18,6 +18,7 @@ import {
   submitDiagnosticAnswer,
 } from "@/lib/api";
 import Lesson from "@/components/lesson";
+import LearningPath from "@/components/learning-path";
 
 type Phase = "starting" | "questions" | "probe" | "done";
 
@@ -34,6 +35,7 @@ type WhyWeThinkThis = {
   rootCause: string;
   confidence: number;
   statement: string;
+  resolution: Record<string, unknown>;
   evidence: Array<{
     questionId: string;
     questionText: string;
@@ -191,6 +193,7 @@ export default function ConceptTest({
         statement:
           (diagnosis.investigation as { statement?: string })?.statement ??
           "Your answers were analysed against the expected understanding of this topic.",
+        resolution: bundle.resolution ?? {},
         evidence: (bundle.evidence ?? []).map((e) => ({
           questionId: e.questionId,
           questionText: e.questionText,
@@ -299,7 +302,16 @@ export default function ConceptTest({
       .filter((e) => e.reasoning && e.reasoning.trim().length > 0)
       .slice(0, 3);
     return (
-      <div className="space-y-4">
+      <>
+        {showLesson && sessionId && (
+          <Lesson
+            subjectId={subjectId}
+            sessionId={sessionId}
+            concept={concept}
+            onClose={() => setShowLesson(false)}
+          />
+        )}
+        <div className="space-y-4">
         <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <h4 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
             How you did
@@ -341,6 +353,7 @@ export default function ConceptTest({
             {why.evidence.length === 1 ? "" : "s"}.
           </p>
         </div>
+        <LearningPath resolution={why.resolution} />
         <div className="flex justify-end gap-2">
           {sessionId && (
             <button
@@ -357,7 +370,8 @@ export default function ConceptTest({
             Done
           </button>
         </div>
-      </div>
+        </div>
+      </>
     );
   }
 
