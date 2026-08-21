@@ -50,6 +50,32 @@ LESSON_SYSTEM_PROMPT = (
     "the technical mechanism must remain accurate. Also fill the analogy object "
     "with the explicit element->mappedTo mapping and be honest in analogy_works "
     "and analogy_breaks about where the analogy fits and where it falls short.\n"
+    "- VISUALIZATION: you MUST also produce a `visualizationSpec` object that "
+    "describes a synchronized animated diagram for the concept. The spec "
+    "describes GENERIC structure (stages, items, connections, animation steps) "
+    "and never topic-specific code. Use type=\"PROCESS_FLOW\" when the concept "
+    "involves stages/steps/flow (most CPU, algorithm, and process concepts). "
+    "Use type=\"CONCEPT_MAP\" when the concept is best shown as a relationship "
+    "graph. The spec must have:\n"
+    "  - `type`: PROCESS_FLOW or CONCEPT_MAP\n"
+    "  - `title`: short title for the diagram\n"
+    "  - `caption`: one sentence linking the diagram to the interest scene (or "
+    "    plain description if interest is normal)\n"
+    "  - `process`: (for PROCESS_FLOW) an object with:\n"
+    "    - `stages`: array of {{id,label}} for each stage/column\n"
+    "    - `items`: array of {{id,label}} for each moving token\n"
+    "    - `animation`: {{steps: [...]}} where each step has:\n"
+    "      - `stepIndex` (1-based), `description` (synced explanation sentence)\n"
+    "      - `stageState`: map of item_id -> stage_id (where each item is)\n"
+    "      - `connections`: array of {{from,to,label,kind}} — kind must be one "
+    "        of: DEPENDENCY, HAZARD, FORWARDING, STALL, FLOW\n"
+    "      - `hazardHighlight`: true if this step shows a conflict\n"
+    "      - `forwardingHighlight`: true if this step shows a bypass\n"
+    "      - `pause`: true if the player should auto-pause here\n"
+    "  - `conceptMap`: (for CONCEPT_MAP) an object with nodes and edges\n\n"
+    "The visualization must be TECHNICALLY ACCURATE — it shows the real "
+    "mechanism, never a fake interest-themed diagram. The interest lens only "
+    "changes the caption text.\n"
     "- Keep the tone student-friendly and progressive (what -> why -> how).\n"
     "- sourceChunks must be integers drawn from the provided chunk indices. "
     "Every claim must be traceable to a shown chunk.\n"
@@ -82,9 +108,18 @@ def build_lesson_user_prompt(
         'Return a JSON object: {{"explanation":"","keyPoints":[],'
         '"analogy":{{"scene":"","mapping":[{{"element":"","mappedTo":"",'
         '"description":""}}],"analogy_works":"","analogy_breaks":""}}'
-        ',"sourceChunks":[]}}\n'
-        "Set \"analogy\" to null when interest is 'normal'. sourceChunks must "
-        "reference the chunk indices above."
+        ',"sourceChunks":[],'
+        '"visualizationSpec":{{"type":"PROCESS_FLOW","title":"",'
+        '"caption":"","process":{{"stages":[{{"id":"","label":""}}],'
+        '"items":[{{"id":"","label":""}}],'
+        '"animation":{{"steps":[{{"stepIndex":1,"description":"",'
+        '"stageState":{{}},"connections":[{{"from":"","to":"",'
+        '"label":"","kind":"FLOW"}}],"hazardHighlight":false,'
+        '"forwardingHighlight":false,"pause":false}}]}}}}}}}}\n'
+        "Set \"analogy\" to null when interest is 'normal'. "
+        "Set visualizationSpec.process for PROCESS_FLOW, "
+        "visualizationSpec.conceptMap for CONCEPT_MAP. "
+        "sourceChunks must reference the chunk indices above."
     ).format(
         concept_name=concept_name,
         root_cause=root_cause,

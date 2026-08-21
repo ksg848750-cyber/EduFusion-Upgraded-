@@ -34,6 +34,7 @@ from app.ai.schemas.learner import (
     QuestionSet,
 )
 from app.ai.schemas.teaching import Clarification, GeneratedLesson
+from app.ai.schemas.visualization import ConceptMapSpec, VisualizationSpec
 from app.core.config import get_settings
 
 _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
@@ -67,6 +68,42 @@ def _render_chunks(chunks: list[dict[str, Any]]) -> str:
     return "\n\n".join(parts)
 
 
+def _normalize_visualization_spec(raw: dict | None, concept_name: str = "") -> dict:
+    """Validate a raw visualizationSpec dict, falling back to a concept map.
+
+    The fail-safe pipeline (doc5): validate → if invalid, retry once with the
+    same spec → if still invalid, return a generic concept-map fallback so a
+    visualization is ALWAYS guaranteed. The LLM never generates executable code.
+    """
+    if not raw:
+        return {
+            "type": "CONCEPT_MAP",
+            "title": concept_name or "Concept",
+            "caption": "",
+            "conceptMap": {"nodes": [{"id": "n1", "label": concept_name or "Concept"}], "edges": []},
+        }
+    try:
+        spec = VisualizationSpec.model_validate(raw)
+        return spec.model_dump(by_alias=True)
+    except Exception:
+        pass
+    # Retry once: try wrapping as a process flow if it looks like one
+    if "stages" in raw or "animation" in raw:
+        try:
+            wrapped = {"type": "PROCESS_FLOW", "title": raw.get("title", concept_name), "process": raw}
+            spec = VisualizationSpec.model_validate(wrapped)
+            return spec.model_dump(by_alias=True)
+        except Exception:
+            pass
+    # Final fallback: generic concept map
+    return {
+        "type": "CONCEPT_MAP",
+        "title": concept_name or "Concept",
+        "caption": "",
+        "conceptMap": {"nodes": [{"id": "n1", "label": concept_name or "Concept"}], "edges": []},
+    }
+
+
 class AIService:
     """Centralized LLM service.
 
@@ -82,7 +119,7 @@ class AIService:
 
             s = get_settings()
             self._provider = GroqAdapter(
-                api_key=s.groq_api_key, model=s.groq_extraction_model
+                api_keys=s.groq_api_key_pool, model=s.groq_extraction_model
             )
         return self._provider
 
@@ -95,7 +132,7 @@ class AIService:
         last_error: Exception | None = None
         for _attempt in range(2):
             try:
-                raw = await provider.complete(SYSTEM_PROMPT, user_prompt, temperature=0.0)
+                raw = await provider.complete(SYSTEM_PROMPT, user_prompt, temperature=0.0, max_tokens=8192)
                 parsed = json.loads(_clean_json(raw))
                 extraction = KnowledgeExtraction.model_validate(parsed)
                 if not extraction.concepts:
@@ -135,6 +172,9 @@ class AIService:
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
                 if _is_rate_limit(exc) and _attempt < attempts - 1:
+                    rotate = getattr(provider, "rotate", None)
+                    if callable(rotate):
+                        rotate()
                     await asyncio.sleep(rate_limit_backoff)
         raise RuntimeError(f"LLM call failed after retries: {last_error}") from last_error
 
@@ -259,10 +299,15 @@ class AIService:
             topic_context=topic_context,
             student_answers=student_answers,
         )
-        return await self._complete_validated(
+        lesson = await self._complete_validated(
             LESSON_SYSTEM_PROMPT, user, GeneratedLesson, temperature=0.3,
-            max_tokens=2000, attempts=3,
+            max_tokens=3000, attempts=3,
         )
+        # Validate/normalize the visualization spec (fail-safe, doc5).
+        lesson.visualizationSpec = _normalize_visualization_spec(
+            lesson.visualizationSpec, concept.get("name", "")
+        )
+        return lesson
 
     async def clarify_doubt(
         self,

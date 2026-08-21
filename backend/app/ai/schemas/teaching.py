@@ -41,6 +41,7 @@ class GeneratedLesson(BaseModel):
     keyPoints: list[str] = Field(default_factory=list)
     analogy: InterestAnalogy | None = None
     sourceChunks: list[int] = Field(default_factory=list)
+    visualizationSpec: dict | None = None
 
 
 class Clarification(BaseModel):

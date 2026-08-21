@@ -10,6 +10,7 @@ import {
   generateLesson,
   type Interest,
 } from "@/lib/api";
+import VisualizationHost from "@/components/visualization/VisualizationHost";
 
 type Props = {
   subjectId: string;
@@ -158,6 +159,12 @@ export default function Lesson({ subjectId, sessionId, concept, onClose }: Props
                   </div>
                 </div>
               </div>
+            )}
+
+            {lesson.visualizationSpec && Object.keys(lesson.visualizationSpec).length > 0 && (
+              <VisualizationHost
+                spec={lesson.visualizationSpec as never}
+              />
             )}
 
             <div className="rounded-xl bg-zinc-900 p-4 text-white dark:bg-zinc-100 dark:text-black">

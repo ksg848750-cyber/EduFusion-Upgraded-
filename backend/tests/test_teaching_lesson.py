@@ -96,7 +96,7 @@ def test_generate_lesson_content_ok(monkeypatch):
     _lesson_deps(monkeypatch)
     _patch_chunks(monkeypatch)
 
-    async def fake_save(owner, lid, explanation, refs, interest):
+    async def fake_save(owner, lid, explanation, refs, interest, **kwargs):
         return {"id": lid, "updatedAt": "now"}
 
     async def fake_event(*a, **k):
@@ -129,7 +129,7 @@ def test_generate_lesson_content_interest_analogy(monkeypatch):
     _lesson_deps(monkeypatch)
     _patch_chunks(monkeypatch)
 
-    async def fake_save(owner, lid, explanation, refs, interest):
+    async def fake_save(owner, lid, explanation, refs, interest, **kwargs):
         return {"id": lid, "updatedAt": "now"}
     async def fake_event(*a, **k):
         return None
@@ -178,7 +178,7 @@ def test_generate_lesson_content_passes_topic_and_answers(monkeypatch):
     _lesson_deps(monkeypatch)
     _patch_chunks(monkeypatch)
 
-    async def fake_save(owner, lid, explanation, refs, interest):
+    async def fake_save(owner, lid, explanation, refs, interest, **kwargs):
         return {"id": lid, "updatedAt": "now"}
 
     async def fake_event(*a, **k):

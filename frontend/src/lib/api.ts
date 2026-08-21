@@ -487,6 +487,7 @@ export type LessonContent = {
   analogy: InterestAnalogy | null;
   sourceChunks: number[];
   sourceReferences: { chunkIndex: number }[];
+  visualizationSpec?: Record<string, unknown> | null;
 };
 
 export type ClarifyResponse = {
@@ -522,7 +523,8 @@ export async function generateLesson(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ interestContext }),
   });
-  return res.json();
+  const json = await res.json();
+  return json;
 }
 
 export async function fetchLesson(

@@ -19,6 +19,9 @@ class Settings(BaseSettings):
 
     # AI / Groq
     groq_api_key: str = ""
+    # Comma-separated list of additional Groq keys (separate accounts) used as
+    # a rotating pool so a 429 rate limit on one key fails over to the next.
+    groq_api_keys: str = ""
     # NOTE: llama-3.3-70b-versatile / llama-3.1-8b-instant are no longer
     # available on Groq accounts. These map to strong/complex (gpt-oss-120b)
     # and simple/fast (gpt-oss-20b) models that are actually provisioned.
@@ -40,6 +43,18 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
+
+    @property
+    def groq_api_key_pool(self) -> list[str]:
+        """All Groq keys, primary first, then any extra pool keys (deduped)."""
+        keys: list[str] = []
+        primary = self.groq_api_key.strip()
+        if primary:
+            keys.append(primary)
+        for k in [k.strip() for k in self.groq_api_keys.split(",") if k.strip()]:
+            if k and k not in keys:
+                keys.append(k)
+        return keys
 
     @property
     def jwks_url(self) -> str:

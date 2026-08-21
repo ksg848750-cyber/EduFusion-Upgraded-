@@ -190,6 +190,7 @@ class LessonContentResponse(BaseModel):
     analogy: dict | None = None
     sourceChunks: list[int] = []
     sourceReferences: list[dict] = []
+    visualizationSpec: dict | None = None
 
 
 class LessonDetailResponse(BaseModel):

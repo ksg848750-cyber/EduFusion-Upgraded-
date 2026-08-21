@@ -420,7 +420,8 @@ async def generate_lesson_content(
     source_refs = [{"chunkIndex": ci} for ci in generated.sourceChunks]
     analogy = generated.analogy.model_dump() if generated.analogy else None
     persisted = await _save_lesson_content(
-        owner_id, lesson_id, generated.explanation, source_refs, interest_context
+        owner_id, lesson_id, generated.explanation, source_refs, interest_context,
+        visualization_spec=generated.visualizationSpec,
     )
     if persisted is None:
         return {"status": "LESSON_ERROR", "lessonId": lesson_id}
@@ -453,6 +454,7 @@ async def generate_lesson_content(
         "analogy": analogy,
         "sourceChunks": generated.sourceChunks,
         "sourceReferences": source_refs,
+        "visualizationSpec": generated.visualizationSpec,
     }
 
 
@@ -462,6 +464,7 @@ async def _save_lesson_content(
     explanation: str,
     source_refs: list[dict],
     interest_context: str,
+    visualization_spec: dict | None = None,
 ) -> dict[str, Any] | None:
     async with connection() as conn:
         if conn is None:
@@ -472,12 +475,13 @@ async def _save_lesson_content(
             SET explanation = %s,
                 source_references = %s,
                 interest_context = %s,
+                visualization_spec = %s,
                 updated_at = now()
             FROM public.subjects s
             WHERE l.id = %s AND s.id = l.subject_id AND s.owner_id = %s
             RETURNING l.id, l.updated_at
             """,
-            (explanation, Jsonb(source_refs), interest_context, lesson_id, owner_id),
+            (explanation, Jsonb(source_refs), interest_context, Jsonb(visualization_spec or {}), lesson_id, owner_id),
         )
         record = await row.fetchone()
         if record is None:
