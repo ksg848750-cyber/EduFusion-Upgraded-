@@ -210,3 +210,34 @@ class ClarifyResponse(BaseModel):
     covered: bool = False
     sourceChunks: list[int] = []
     disclaimer: str = ""
+
+
+class ReassessmentRequest(BaseModel):
+    interestContext: str = "normal"
+
+
+class ReassessmentResponse(BaseModel):
+    status: str
+    reassessmentId: str | None = None
+    lessonId: str | None = None
+    conceptId: str | None = None
+    questionType: str = "MCQ"
+    questionText: str = ""
+    options: list[dict] = []
+    attempt: int = 1
+
+
+class ReassessmentAnswerRequest(BaseModel):
+    response: str = ""
+    reasoning: str = ""
+    selectedOptionId: str = ""
+
+
+class ReassessmentAnswerResponse(BaseModel):
+    status: str
+    reassessmentId: str | None = None
+    outcome: str = ""
+    correctness: bool = False
+    mastery: float = 0.0
+    conceptStatus: str = ""
+    attempt: int = 1

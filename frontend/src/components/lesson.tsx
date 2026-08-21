@@ -8,7 +8,11 @@ import {
   clarifyLessonDoubt,
   createTeachingDecision,
   generateLesson,
+  startReassessment,
+  submitReassessmentAnswer,
   type Interest,
+  type Reassessment,
+  type ReassessmentResult,
 } from "@/lib/api";
 import VisualizationHost from "@/components/visualization/VisualizationHost";
 
@@ -16,7 +20,7 @@ type Props = {
   subjectId: string;
   sessionId: string;
   concept: Concept;
-  onClose: () => void;
+  onClose: (result?: "passed" | "failed" | "retry") => void;
 };
 
 const INTEREST_LABEL: Record<Interest, string> = {
@@ -41,6 +45,16 @@ export default function Lesson({ subjectId, sessionId, concept, onClose }: Props
   const [clarifying, setClarifying] = useState(false);
   const [clarify, setClarify] = useState<Awaited<ReturnType<typeof clarifyLessonDoubt>> | null>(null);
   const [clarifyError, setClarifyError] = useState<string | null>(null);
+
+  // Reassessment state
+  const [reassessment, setReassessment] = useState<Reassessment | null>(null);
+  const [reassessLoading, setReassessLoading] = useState(false);
+  const [reassessError, setReassessError] = useState<string | null>(null);
+  const [selectedOption, setSelectedOption] = useState("");
+  const [freeResponse, setFreeResponse] = useState("");
+  const [freeReasoning, setFreeReasoning] = useState("");
+  const [reassessResult, setReassessResult] = useState<ReassessmentResult | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   async function loadLesson(nextInterest: Interest) {
     setLoading(true);
@@ -84,6 +98,210 @@ export default function Lesson({ subjectId, sessionId, concept, onClose }: Props
     }
   }
 
+  async function handleStartReassessment() {
+    if (!lesson?.lessonId) return;
+    setReassessLoading(true);
+    setReassessError(null);
+    try {
+      const res = await startReassessment(subjectId, lesson.lessonId);
+      if (res.status !== "OK" || !res.reassessmentId) {
+        throw new Error(res.status);
+      }
+      setReassessment(res);
+    } catch (err) {
+      setReassessError(err instanceof Error ? err.message : "Failed to start reassessment");
+    } finally {
+      setReassessLoading(false);
+    }
+  }
+
+  async function handleSubmitReassessment() {
+    if (!reassessment?.reassessmentId) return;
+    setSubmitting(true);
+    try {
+      const res = await submitReassessmentAnswer(
+        subjectId,
+        reassessment.reassessmentId,
+        reassessment.questionType === "MCQ" ? selectedOption : freeResponse,
+        freeReasoning,
+        selectedOption,
+      );
+      setReassessResult(res);
+    } catch (err) {
+      setReassessError(err instanceof Error ? err.message : "Submission failed");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // --- Reassessment result screen ---
+  if (reassessResult) {
+    const passed = reassessResult.outcome === "PASSED";
+    const failed = reassessResult.outcome === "FAILED";
+    return (
+      <div className="pointer-events-auto fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm">
+        <div className="my-4 w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-950">
+          <div className="text-center">
+            <div className={`mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full text-2xl ${
+              passed
+                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
+                : "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300"
+            }`}>
+              {passed ? "\u2713" : "\u2717"}
+            </div>
+            <h3 className="text-lg font-bold text-black dark:text-zinc-50">
+              {passed ? "Great work!" : "Not quite there yet"}
+            </h3>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              {passed
+                ? "You demonstrated understanding of the concept."
+                : "The lesson needs a different approach."}
+            </p>
+          </div>
+
+          <div className="mt-4 rounded-lg bg-zinc-50 p-3 text-sm dark:bg-zinc-900">
+            <div className="flex justify-between text-zinc-600 dark:text-zinc-400">
+              <span>Mastery</span>
+              <span className="font-mono font-semibold text-black dark:text-zinc-100">
+                {Math.round(reassessResult.mastery * 100)}%
+              </span>
+            </div>
+            <div className="mt-1 flex justify-between text-zinc-600 dark:text-zinc-400">
+              <span>Status</span>
+              <span className={`font-semibold ${
+                reassessResult.conceptStatus === "MASTERED"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : reassessResult.conceptStatus === "DEVELOPING"
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-zinc-600 dark:text-zinc-400"
+              }`}>
+                {reassessResult.conceptStatus}
+              </span>
+            </div>
+            <div className="mt-1 flex justify-between text-zinc-600 dark:text-zinc-400">
+              <span>Attempt</span>
+              <span className="font-mono">{reassessResult.attempt} of 3</span>
+            </div>
+          </div>
+
+          <div className="mt-5 flex gap-3">
+            {passed && (
+              <button
+                onClick={() => onClose("passed")}
+                className="flex-1 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-500"
+              >
+                Continue
+              </button>
+            )}
+            {failed && reassessResult.attempt < 3 && (
+              <button
+                onClick={() => {
+                  setReassessment(null);
+                  setReassessResult(null);
+                  setSelectedOption("");
+                  setFreeResponse("");
+                  setFreeReasoning("");
+                  // Trigger a new teaching decision by closing with retry
+                  onClose("retry");
+                }}
+                className="flex-1 rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-purple-500"
+              >
+                Try different approach
+              </button>
+            )}
+            {failed && reassessResult.attempt >= 3 && (
+              <button
+                onClick={() => onClose("failed")}
+                className="flex-1 rounded-lg bg-zinc-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-zinc-500"
+              >
+                Back to concept
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Reassessment question screen ---
+  if (reassessment) {
+    return (
+      <div className="pointer-events-auto fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm">
+        <div className="my-4 w-full max-w-lg rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-950">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-bold text-black dark:text-zinc-50">Check your understanding</h3>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                Attempt {reassessment.attempt} of 3 &middot; {concept.name}
+              </p>
+            </div>
+            <button
+              onClick={() => { setReassessment(null); setReassessError(null); }}
+              className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="mt-4 rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900">
+            <p className="text-sm font-medium text-black dark:text-zinc-100">{reassessment.questionText}</p>
+          </div>
+
+          {reassessment.questionType === "MCQ" && reassessment.options.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {reassessment.options.map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => setSelectedOption(opt.id)}
+                  className={`w-full rounded-lg border p-3 text-left text-sm transition-colors ${
+                    selectedOption === opt.id
+                      ? "border-purple-500 bg-purple-50 text-purple-900 dark:border-purple-400 dark:bg-purple-950 dark:text-purple-100"
+                      : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                  }`}
+                >
+                  <span className="mr-2 font-semibold">{opt.id.toUpperCase()}.</span>
+                  {opt.text}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {reassessment.questionType === "SHORT_ANSWER" && (
+            <div className="mt-3 space-y-2">
+              <textarea
+                value={freeResponse}
+                onChange={(e) => setFreeResponse(e.target.value)}
+                placeholder="Your answer..."
+                rows={3}
+                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-purple-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              />
+              <textarea
+                value={freeReasoning}
+                onChange={(e) => setFreeReasoning(e.target.value)}
+                placeholder="Explain your reasoning..."
+                rows={2}
+                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-purple-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              />
+            </div>
+          )}
+
+          {reassessError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{reassessError}</p>}
+
+          <div className="mt-4">
+            <button
+              onClick={handleSubmitReassessment}
+              disabled={submitting || (reassessment.questionType === "MCQ" ? !selectedOption : !freeResponse.trim())}
+              className="w-full rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-purple-500 disabled:opacity-50"
+            >
+              {submitting ? "Evaluating..." : "Submit answer"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Main lesson screen ---
   return (
     <div className="pointer-events-auto fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-4 backdrop-blur-sm">
       <div className="my-4 w-full max-w-2xl rounded-2xl border border-zinc-200 bg-white p-6 shadow-2xl dark:border-zinc-800 dark:bg-zinc-950">
@@ -117,7 +335,7 @@ export default function Lesson({ subjectId, sessionId, concept, onClose }: Props
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={() => onClose()}
             aria-label="Close"
             className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
           >
@@ -234,6 +452,16 @@ export default function Lesson({ subjectId, sessionId, concept, onClose }: Props
                 </div>
               )}
             </div>
+
+            {/* Check your understanding button */}
+            <button
+              onClick={handleStartReassessment}
+              disabled={reassessLoading}
+              className="w-full rounded-xl border-2 border-purple-300 bg-purple-50 px-4 py-3 text-sm font-semibold text-purple-700 transition-colors hover:bg-purple-100 disabled:opacity-50 dark:border-purple-700 dark:bg-purple-950 dark:text-purple-200 dark:hover:bg-purple-900"
+            >
+              {reassessLoading ? "Generating question..." : "Check your understanding"}
+            </button>
+            {reassessError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{reassessError}</p>}
           </div>
         )}
       </div>

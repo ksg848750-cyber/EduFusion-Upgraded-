@@ -308,7 +308,13 @@ export default function ConceptTest({
             subjectId={subjectId}
             sessionId={sessionId}
             concept={concept}
-            onClose={() => setShowLesson(false)}
+            onClose={(result) => {
+              setShowLesson(false);
+              if (result === "retry") {
+                // Close everything so the user can restart from concept
+                onClose();
+              }
+            }}
           />
         )}
         <div className="space-y-4">

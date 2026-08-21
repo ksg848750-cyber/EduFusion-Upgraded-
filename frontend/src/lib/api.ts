@@ -547,3 +547,51 @@ export async function clarifyLessonDoubt(
   });
   return res.json();
 }
+
+export type Reassessment = {
+  status: string;
+  reassessmentId?: string | null;
+  lessonId?: string | null;
+  conceptId?: string | null;
+  questionType: string;
+  questionText: string;
+  options: { id: string; text: string }[];
+  attempt: number;
+};
+
+export type ReassessmentResult = {
+  status: string;
+  reassessmentId?: string | null;
+  outcome: string;
+  correctness: boolean;
+  mastery: number;
+  conceptStatus: string;
+  attempt: number;
+};
+
+export async function startReassessment(
+  subjectId: string,
+  lessonId: string,
+): Promise<Reassessment> {
+  const res = await authedFetch(`/subjects/${subjectId}/lessons/${lessonId}/reassess`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  return res.json();
+}
+
+export async function submitReassessmentAnswer(
+  subjectId: string,
+  reassessmentId: string,
+  response: string,
+  reasoning: string,
+  selectedOptionId: string = "",
+): Promise<ReassessmentResult> {
+  const res = await authedFetch(`/subjects/${subjectId}/reassessments/${reassessmentId}/answer`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ response, reasoning, selectedOptionId }),
+  });
+  return res.json();
+}

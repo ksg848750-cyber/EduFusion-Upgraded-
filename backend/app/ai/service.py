@@ -25,6 +25,10 @@ from app.ai.prompts.teaching import (
     build_clarify_user_prompt,
     build_lesson_user_prompt,
 )
+from app.ai.prompts.reassessment import (
+    REASSESSMENT_SYSTEM_PROMPT,
+    REASSESSMENT_USER_TEMPLATE,
+)
 from app.ai.providers.base import BaseLLMProvider
 from app.ai.schemas.extraction import KnowledgeExtraction
 from app.ai.schemas.learner import (
@@ -34,6 +38,7 @@ from app.ai.schemas.learner import (
     QuestionSet,
 )
 from app.ai.schemas.teaching import Clarification, GeneratedLesson
+from app.ai.schemas.reassessment import GeneratedReassessment
 from app.ai.schemas.visualization import ConceptMapSpec, VisualizationSpec
 from app.core.config import get_settings
 
@@ -359,6 +364,35 @@ class AIService:
         )
         return await self._complete_validated(
             EVALUATE_SYSTEM_PROMPT, user, AnswerEvaluation, temperature=0.1
+        )
+
+    async def generate_reassessment(
+        self,
+        concept: dict[str, Any],
+        root_cause: str,
+        teaching_strategy: str,
+        existing_questions: list[dict[str, Any]],
+        chunks: list[dict[str, Any]],
+    ) -> GeneratedReassessment:
+        """Generate a NOVEL reassessment question targeting the same root cause.
+
+        The question must use different wording/context from the original
+        diagnostic questions to verify the lesson actually repaired the gap.
+        """
+        existing_text = "\n".join(
+            f"- [{q.get('questionType', '?')}] {q.get('questionText', '')[:120]}"
+            for q in existing_questions
+        ) or "(none)"
+        user = REASSESSMENT_USER_TEMPLATE.format(
+            concept_name=concept.get("name", ""),
+            root_cause=root_cause,
+            teaching_strategy=teaching_strategy,
+            existing_questions=existing_text,
+            source_chunks=_render_chunks(chunks),
+        )
+        return await self._complete_validated(
+            REASSESSMENT_SYSTEM_PROMPT, user, GeneratedReassessment,
+            temperature=0.3, max_tokens=2000, attempts=3,
         )
 
 
