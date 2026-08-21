@@ -69,41 +69,41 @@ MILESTONE 5: ADAPTIVE TEACHING ENGINE
   ├─ RAG Grounding pipeline (retrieving source chunks; M3 establishes the pattern)
   └─ Contextual Interest Analogy engine (`cricket`, `anime`, `normal`)
 
-MILESTONE 6: VISUALIZATION ENGINE
-  ├─ Declarative `visualizationSpec` Pydantic validator
-  ├─ Visualization Registry implementation
-  ├─ CPU Pipelining Renderers (`PipelineRenderer`, `HazardRenderer`, `ForwardingRenderer`)
-  ├─ SVG + Framer Motion synchronized animation player (Play, Pause, Step)
-  └─ Generic Fallback Renderers (`GenericProcessRenderer`)
+MILESTONE 6: VISUALIZATION ENGINE ✅ BUILT
+  ├─ Declarative `visualizationSpec` Pydantic validator (VisualizationSpec, ProcessFlowSpec, ConceptMapSpec)
+  ├─ Visualization Registry implementation (PROCESS_FLOW, CONCEPT_MAP, GENERIC_PROCESS)
+  ├─ ProcessFlowRenderer with animated SVG lanes, play/pause/step, speed control
+  ├─ ConceptMapRenderer (auto-layout nodes/edges SVG)
+  ├─ GenericProcessRenderer (static flow fallback)
+  ├─ VisualizationHost entry point with normalizeToRenderable fail-safe
+  ├─ LLM prompt generates visualizationSpec in lesson generation
+  ├─ Backend persistence (lessons.visualization_spec jsonb)
+  └─ Frontend wired into lesson.tsx between interest lens and explanation
 
-MILESTONE 7: REASSESSMENT & LEARNER MODEL CLOSED LOOP
-  ├─ Targeted Reassessment Question Generator (Novel Scenario, Same Gap)
-  ├─ Reassessment Evaluation (`PASSED`, `FAILED`, `INCONCLUSIVE`)
-  ├─ Mastery Engine update (reuses M3 deterministic mastery engine)
-  ├─ Learner Model State Update (`learner_models` & `misconceptions` — rows now exist from M3)
-  └─ Immutable History Logger (`learning_events` — pipeline now live from M3)
+MILESTONE 7: REASSESSMENT & LEARNER MODEL CLOSED LOOP ✅ BUILT (tests pending)
+  ├─ reassessments table (migration 011)
+  ├─ Reassessment question generation (AI prompt + Pydantic schema)
+  ├─ 3 API endpoints: POST /reassess, POST /answer, GET /reassessment
+  ├─ Mastery update (deterministic, reuses apply_evidence() + update_concept_state())
+  ├─ Strategy outcome recording (writes to learner_models.strategy_profile)
+  ├─ Misconception resolution (ACTIVE → RESOLVED after PASSED)
+  ├─ Diagnosis resolution (OPEN → RESOLVED after PASSED)
+  ├─ Max 3 attempt enforcement (UI shows "Back to concept" at attempt 3)
+  ├─ Frontend: question card → PASSED/FAILED result screen
+  └─ Frontend: retry → close lesson, passed → continue, failed → back to concept
 
-MILESTONE 8: STITCH MCP UI REFINEMENT
-  ├─ Stitch Design System Integration (Typography, Tokens, Components)
-  ├─ Mobile & Desktop responsive layout polish
-  ├─ Error, Empty, and Loading state polish
-  └─ Student Dashboard & Analytics integration
+MILESTONE 8: LEARNING HISTORY + DASHBOARD
+  ├─ Subject-level progress overview (mastery % per subject)
+  ├─ Knowledge Graph concept color-coding by status (UNKNOWN/WEAK/DEVELOPING/MASTERED)
+  ├─ Learning history view (past diagnostics, lessons, reassessments)
+  └─ Progress tracking across concepts
 
-MILESTONE 9: DEMO REHEARSAL & DEPLOYMENT
-  ├─ Golden End-to-End Demo Test Case verification
-  ├─ Secret isolation & deployment (Next.js on Vercel, FastAPI on Render)
-  └─ Final demo rehearsal
-
-MILESTONE 7: STITCH MCP UI REFINEMENT
-  ├─ Stitch Design System Integration (Typography, Tokens, Components)
-  ├─ Mobile & Desktop responsive layout polish
-  ├─ Error, Empty, and Loading state polish
-  └─ Student Dashboard & Analytics integration
-
-MILESTONE 8: DEMO REHEARSAL & DEPLOYMENT
-  ├─ Golden End-to-End Demo Test Case verification
-  ├─ Secret isolation & deployment (Next.js on Vercel, FastAPI on Render)
-  └─ Final demo rehearsal
+MILESTONE 9: UI/UX POLISH
+  ├─ Consistent styling and color scheme
+  ├─ Loading spinners and empty states
+  ├─ Mobile responsive layout
+  ├─ Smooth transitions and animations
+  └─ Error state polish
 ```
 
 ---

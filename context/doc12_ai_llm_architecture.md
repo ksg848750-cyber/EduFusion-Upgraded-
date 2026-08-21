@@ -50,22 +50,69 @@
 backend/app/
 │
 ├── ai/
-│   ├── service.py            # Central AIService class
-│   ├── context_builder.py    # Task-specific token/context assembler
-│   ├── schemas/              # Pydantic JSON output contracts
-│   ├── prompts/              # Modular versioned prompt templates
-│   │   ├── extraction/       # concept_extraction_v1.py, relationships_v1.py
-│   │   ├── diagnostics/      # scenario_gen_v1.py, reasoning_eval_v1.py
-│   │   ├── teaching/         # lesson_gen_v2.py, interest_analogy_v1.py
-│   │   ├── visualization/    # spec_gen_v1.py
-│   │   └── reassessment/     # reassess_gen_v1.py, reassess_eval_v1.py
+│   ├── service.py              # Central AIService (extract, diagnose, teach, reassess)
+│   ├── context_builder.py      # Task-specific token/context assembler
+│   ├── schemas/
+│   │   ├── extraction.py       # KnowledgeExtraction, ExtractedConcept, etc.
+│   │   ├── learner.py          # GeneratedQuestion, AnswerEvaluation, etc.
+│   │   ├── teaching.py         # GeneratedLesson, Clarification
+│   │   ├── reassessment.py     # GeneratedReassessment
+│   │   └── visualization.py    # VisualizationSpec, ProcessFlowSpec, ConceptMapSpec
+│   ├── prompts/
+│   │   ├── extraction.py       # System + user prompts for concept extraction
+│   │   ├── learner.py          # Diagnostic, evaluation, explanation, probe prompts
+│   │   ├── teaching.py         # Lesson generation + clarification prompts
+│   │   └── reassessment.py     # Reassessment question generation prompt
 │   └── providers/
-│       ├── base.py           # Abstract LLMProvider interface
-│       └── groq_adapter.py   # Groq SDK implementation (Llama 3.3 70B & 3.1 8B)
+│       ├── base.py             # Abstract LLMProvider interface
+│       └── groq_adapter.py     # Groq SDK (2-key rotation, openai/gpt-oss-120b + 20b)
 │
-└── rag/
-    ├── embeddings.py         # Embedding model caller
-    └── retriever.py          # Metadata-filtered pgvector Vector Search
+├── services/
+│   ├── users.py                # User persistence (Supabase Auth → app UUID)
+│   ├── subjects.py             # Subject CRUD
+│   ├── materials.py            # Material CRUD + status tracking
+│   ├── chunks.py               # Document chunk storage + pgvector retrieval
+│   ├── ingestion.py            # Full pipeline: parse → chunk → embed → extract → graph
+│   ├── extraction.py           # Thin wrapper around AIService.extract_knowledge
+│   ├── graph.py                # Deterministic graph build: dedup, cycles, edge capping
+│   ├── concepts.py             # Concept CRUD (upsert on canonical_name)
+│   ├── relationships.py        # Concept relationship CRUD
+│   ├── concept_context.py      # RAG grounding: exact refs + vector fallback
+│   ├── learner.py              # Mastery engine: delta, apply_evidence, update_concept_state
+│   ├── misconceptions.py       # Misconception lifecycle: SUSPECTED → RESOLVED
+│   ├── sessions.py             # Diagnostic session lifecycle
+│   ├── questions.py            # Question persistence + retrieval
+│   ├── answers.py              # Answer persistence + retrieval
+│   ├── diagnoses.py            # Diagnosis persistence
+│   ├── learning_events.py      # Append-only immutable event log
+│   ├── diagnostic_analysis.py  # Deterministic evidence analysis (CONFIDENT/AMBIGUOUS/NO_ISSUE)
+│   ├── target_resolution.py    # Prerequisite graph walker for diagnostic target
+│   ├── diagnostics.py          # Orchestrates full diagnostic loop
+│   ├── teaching.py             # Dual-decision engine + lesson generation
+│   ├── reassessments.py        # Reassessment + mastery update + strategy outcomes
+│   └── study.py                # Self-study mode (explain/test/answer)
+│
+├── api/v1/
+│   ├── router.py               # API router (24 endpoints)
+│   └── endpoints/
+│       ├── auth.py             # GET /auth/me
+│       ├── health.py           # GET /health
+│       ├── subjects.py         # Subject + material + knowledge graph
+│       ├── learner.py          # Learner model + explain + test
+│       ├── diagnostics.py      # Full diagnostic flow (6 endpoints)
+│       ├── teaching.py         # Teaching decision + lesson + clarify
+│       └── reassessments.py    # Reassess + answer + get (3 endpoints)
+│
+├── core/
+│   ├── config.py               # Settings (env vars, Groq keys, Supabase keys)
+│   ├── database.py             # PostgreSQL connection pool
+│   └── security.py             # JWT verification (Supabase JWKS)
+│
+├── schemas/
+│   └── learner.py              # Request/Response Pydantic models (all endpoints)
+│
+└── db/
+    └── migrations/             # 11 SQL migrations (001-011)
 ```
 
 ---

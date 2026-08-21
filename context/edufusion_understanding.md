@@ -377,16 +377,21 @@ This structure comes from LLM extraction of the uploaded notes — not from hard
 
 ## MVP Scope (What The Demo Must Prove)
 
-1. Upload CPU Pipelining notes → LLM builds concept graph
-2. Five diagnostic questions (optimized for mental-model discovery)
-3. Structured diagnosis with evidence ("Why we think this" visible in UI)
-4. Targeted lesson (correct for the specific gap, not generic topic)
-5. Mandatory visualization (one of: Pipeline, Hazard, Forwarding renderer)
-6. Adaptive decision visible to student/judge
-7. Reassessment targeting the same gap
-8. Deterministic mastery update (e.g. 21% → 67%)
-9. Failure → strategy change or prerequisite repair (demonstrable)
-10. Learner state persisted in Supabase PostgreSQL
+1. ✅ Upload CPU Pipelining notes → LLM builds concept graph
+2. ✅ Five diagnostic questions (optimized for mental-model discovery)
+3. ✅ Structured diagnosis with evidence ("Why we think this" visible in UI)
+4. ✅ Targeted lesson (correct for the specific gap, not generic topic)
+5. ✅ Mandatory visualization (ProcessFlow, ConceptMap, GenericProcess renderers)
+6. ✅ Adaptive decision visible to student/judge
+7. ✅ Reassessment targeting the same gap
+8. ✅ Deterministic mastery update (e.g. 21% → 67%)
+9. ✅ Failure → strategy change or prerequisite repair (demonstrable)
+10. ✅ Learner state persisted in Supabase PostgreSQL
+
+### Remaining for Hackathon
+- M7 tests (Slice 10)
+- M8: Learning History + Dashboard (subject progress, concept colors on graph)
+- M9: UI/UX polish (loading states, responsive, consistent styling)
 
 ---
 
