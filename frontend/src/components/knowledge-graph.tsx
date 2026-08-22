@@ -147,6 +147,13 @@ function computeGraphLayout(concepts: Concept[], relationships: Relationship[]) 
   };
 }
 
+const STATUS_COLORS: Record<string, { fill: string; stroke: string; darkFill: string; darkStroke: string }> = {
+  MASTERED:  { fill: "#dcfce7", stroke: "#22c55e", darkFill: "#052e16", darkStroke: "#22c55e" },
+  DEVELOPING:{ fill: "#fef3c7", stroke: "#f59e0b", darkFill: "#451a03", darkStroke: "#f59e0b" },
+  WEAK:      { fill: "#ffe4e6", stroke: "#f43f5e", darkFill: "#4c0519", darkStroke: "#f43f5e" },
+  UNKNOWN:   { fill: "#f4f4f5", stroke: "#d4d4d8", darkFill: "#18181b", darkStroke: "#3f3f46" },
+};
+
 type TreeNodeProps = {
   id: string;
   name: string;
@@ -155,6 +162,7 @@ type TreeNodeProps = {
   isExpanded: boolean;
   childCount: number;
   isSelected: boolean;
+  conceptStatus?: string;
   onToggle: (id: string) => void;
   onSelect: (id: string) => void;
 };
@@ -167,10 +175,13 @@ const TreeNode = memo(function TreeNode({
   isExpanded,
   childCount,
   isSelected,
+  conceptStatus,
   onToggle,
   onSelect,
 }: TreeNodeProps) {
   const isParent = hasChildren;
+  const status = conceptStatus as keyof typeof STATUS_COLORS | undefined;
+  const nodeColors = !isRoot && status ? STATUS_COLORS[status] ?? STATUS_COLORS.UNKNOWN : null;
   return (
     <g>
       <rect
@@ -186,8 +197,11 @@ const TreeNode = memo(function TreeNode({
               ? "fill-zinc-100 stroke-zinc-300 dark:fill-zinc-800 dark:stroke-zinc-600"
               : "fill-zinc-50 stroke-zinc-200 dark:fill-zinc-900 dark:stroke-zinc-700"
         }
-        strokeWidth={isSelected ? 2 : 1}
-        style={{ cursor: "pointer" }}
+        style={{
+          cursor: "pointer",
+          strokeWidth: isSelected ? 2 : 1,
+          ...(nodeColors && !isParent ? { fill: nodeColors.fill, stroke: nodeColors.stroke } : {}),
+        }}
         onClick={() => onSelect(id)}
       />
       <text
@@ -412,11 +426,13 @@ export default function KnowledgeGraph({
   relationships,
   subjectName,
   onStudy,
+  conceptStates,
 }: {
   concepts: Concept[];
   relationships: Relationship[];
   subjectName?: string;
   onStudy?: (concept: Concept, mode: "understand" | "test") => void;
+  conceptStates?: Record<string, { status?: string; mastery?: number }>;
 }) {
   const [mode, setMode] = useState<"map" | "graph">("map");
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set([ROOT_ID]));
@@ -522,6 +538,19 @@ export default function KnowledgeGraph({
           </button>
         </div>
         <div className="flex items-center gap-2">
+          {conceptStates && Object.keys(conceptStates).length > 0 && (
+            <div className="hidden items-center gap-2 text-[10px] sm:flex">
+              {(["MASTERED", "DEVELOPING", "WEAK", "UNKNOWN"] as const).map((s) => (
+                <span key={s} className="flex items-center gap-1">
+                  <span
+                    className="inline-block h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: STATUS_COLORS[s].stroke }}
+                  />
+                  <span className="text-zinc-500 dark:text-zinc-400">{s}</span>
+                </span>
+              ))}
+            </div>
+          )}
           <span className="hidden text-xs text-zinc-400 sm:inline">
             {mode === "map" ? "Click + to reveal topics" : "Explore all connections"}
           </span>
@@ -590,6 +619,7 @@ export default function KnowledgeGraph({
                     isExpanded={expanded.has(id)}
                     childCount={kids.length}
                     isSelected={selectedId === id}
+                    conceptStatus={concept && conceptStates ? conceptStates[concept.id]?.status : undefined}
                     onToggle={toggle}
                     onSelect={select}
                   />

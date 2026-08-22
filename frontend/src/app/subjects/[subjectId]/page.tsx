@@ -8,7 +8,10 @@ import KnowledgeGraph from "@/components/knowledge-graph";
 import ConceptStudy from "@/components/concept-study";
 import {
   fetchKnowledgeGraph,
+  fetchLearningHistory,
+  fetchSubjectLearner,
   KnowledgeGraph as KnowledgeGraphData,
+  LearningEvent,
   listMaterials,
   Material,
   Concept,
@@ -23,12 +26,54 @@ const STATUS_LABEL: Record<string, string> = {
   FAILED: "Failed",
 };
 
+const EVENT_LABEL: Record<string, string> = {
+  MATERIAL_UPLOADED: "Material uploaded",
+  MATERIAL_PROCESSED: "Material processed",
+  DIAGNOSTIC_STARTED: "Diagnostic started",
+  QUESTION_ANSWERED: "Question answered",
+  DIAGNOSIS_CREATED: "Diagnosis created",
+  MISCONCEPTION_DETECTED: "Misconception detected",
+  MISCONCEPTION_RESOLVED: "Misconception resolved",
+  LESSON_STARTED: "Lesson started",
+  LESSON_CONTENT_READY: "Lesson content ready",
+  LESSON_COMPLETED: "Lesson completed",
+  VISUALIZATION_VIEWED: "Visualization viewed",
+  REASSESSMENT_STARTED: "Reassessment started",
+  REASSESSMENT_COMPLETED: "Reassessment completed",
+  MASTERY_UPDATED: "Mastery updated",
+  CONCEPT_UNDERSTAND_REQUESTED: "Concept explored",
+  TEST_SESSION_COMPLETED: "Test completed",
+};
+
+function formatEventType(eventType: string): string {
+  return EVENT_LABEL[eventType] ?? eventType.replace(/_/g, " ").toLowerCase();
+}
+
+function formatMetadata(ev: { metadata: Record<string, unknown>; eventType: string }): string {
+  const m = ev.metadata;
+  if (ev.eventType === "MASTERY_UPDATED" && typeof m.mastery === "number") {
+    return `Mastery: ${Math.round(m.mastery * 100)}%`;
+  }
+  if (ev.eventType === "QUESTION_ANSWERED" && typeof m.correct === "boolean") {
+    return m.correct ? "Correct" : "Incorrect";
+  }
+  if (ev.eventType === "REASSESSMENT_COMPLETED" && typeof m.outcome === "string") {
+    return `Outcome: ${m.outcome}`;
+  }
+  if (typeof m.conceptName === "string") {
+    return m.conceptName;
+  }
+  return "";
+}
+
 export default function SubjectPage({ params }: { params: Promise<{ subjectId: string }> }) {
   const { subjectId } = use(params);
   const router = useRouter();
 
   const [graph, setGraph] = useState<KnowledgeGraphData | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [conceptStates, setConceptStates] = useState<Record<string, { status?: string; mastery?: number }>>({});
+  const [history, setHistory] = useState<LearningEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,6 +90,14 @@ export default function SubjectPage({ params }: { params: Promise<{ subjectId: s
     ]);
     setGraph(g);
     setMaterials(m);
+    try {
+      const learner = await fetchSubjectLearner(subjectId);
+      setConceptStates(learner.conceptStates ?? {});
+    } catch { /* learner not started yet */ }
+    try {
+      const h = await fetchLearningHistory(subjectId);
+      setHistory(h.events);
+    } catch { /* no history yet */ }
   }
 
   useEffect(() => {
@@ -63,6 +116,14 @@ export default function SubjectPage({ params }: { params: Promise<{ subjectId: s
         if (cancelled) return;
         setGraph(g);
         setMaterials(m);
+        try {
+          const learner = await fetchSubjectLearner(subjectId);
+          if (!cancelled) setConceptStates(learner.conceptStates ?? {});
+        } catch { /* learner not started yet */ }
+        try {
+          const h = await fetchLearningHistory(subjectId);
+          if (!cancelled) setHistory(h.events);
+        } catch { /* no history yet */ }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load");
       } finally {
@@ -170,6 +231,7 @@ export default function SubjectPage({ params }: { params: Promise<{ subjectId: s
             concepts={graph?.concepts ?? []}
             relationships={graph?.relationships ?? []}
             subjectName={graph?.subject.name}
+            conceptStates={conceptStates}
             onStudy={(concept, mode) => setStudy({ concept, mode })}
           />
         </section>
@@ -189,7 +251,9 @@ export default function SubjectPage({ params }: { params: Promise<{ subjectId: s
             Materials
           </h2>
           {materials.length === 0 ? (
-            <p className="text-sm text-zinc-500">No materials uploaded yet.</p>
+            <div className="rounded-xl border border-dashed border-zinc-300 p-6 text-center dark:border-zinc-700">
+              <p className="text-sm text-zinc-500">No materials uploaded yet.</p>
+            </div>
           ) : (
             <ul className="divide-y divide-zinc-200 rounded-xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
               {materials.map((m) => (
@@ -216,6 +280,39 @@ export default function SubjectPage({ params }: { params: Promise<{ subjectId: s
                   >
                     {STATUS_LABEL[m.processingStatus] ?? m.processingStatus}
                   </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section>
+          <h2 className="mb-3 text-lg font-semibold text-black dark:text-zinc-50">
+            Learning history
+          </h2>
+          {history.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-zinc-300 p-6 text-center dark:border-zinc-700">
+              <p className="text-sm text-zinc-500">
+                No learning events yet. Start a diagnostic or lesson to begin tracking.
+              </p>
+            </div>
+          ) : (
+            <ul className="divide-y divide-zinc-200 rounded-xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+              {history.map((ev) => (
+                <li key={ev.id} className="px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-black dark:text-zinc-100">
+                      {formatEventType(ev.eventType)}
+                    </span>
+                    <span className="text-xs text-zinc-400">
+                      {new Date(ev.timestamp).toLocaleString()}
+                    </span>
+                  </div>
+                  {ev.metadata && Object.keys(ev.metadata).length > 0 && (
+                    <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                      {formatMetadata(ev)}
+                    </p>
+                  )}
                 </li>
               ))}
             </ul>

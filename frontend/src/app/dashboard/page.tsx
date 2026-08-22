@@ -7,16 +7,38 @@ import Link from "next/link";
 import {
   createSubject,
   fetchMe,
+  fetchSubjectLearner,
   listSubjects,
   Subject,
   UserProfile,
 } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
+function MasteryBar({ mastery }: { mastery: number }) {
+  const pct = Math.round(mastery * 100);
+  const color =
+    pct >= 85
+      ? "bg-emerald-500"
+      : pct >= 50
+      ? "bg-amber-500"
+      : pct > 0
+      ? "bg-rose-500"
+      : "bg-zinc-200 dark:bg-zinc-700";
+  return (
+    <div className="flex items-center gap-2">
+      <div className="h-2 w-24 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-xs font-mono text-zinc-500 dark:text-zinc-400">{pct}%</span>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [masteryMap, setMasteryMap] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +60,22 @@ export default function DashboardPage() {
         if (cancelled) return;
         setProfile(me);
         setSubjects(list);
+
+        // Fetch mastery for each subject in parallel
+        const entries = await Promise.all(
+          list.map(async (s) => {
+            try {
+              const learner = await fetchSubjectLearner(s.id);
+              return [s.id, learner.overallMastery] as const;
+            } catch {
+              return [s.id, 0] as const;
+            }
+          })
+        );
+        if (cancelled) return;
+        const map: Record<string, number> = {};
+        for (const [id, m] of entries) map[id] = m;
+        setMasteryMap(map);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load");
       } finally {
@@ -73,7 +111,13 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <main className="flex flex-1 items-center justify-center bg-zinc-50 dark:bg-black">
-        <p className="text-zinc-500">Loading…</p>
+        <div className="flex items-center gap-3 text-zinc-500">
+          <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Loading…
+        </div>
       </main>
     );
   }
@@ -140,9 +184,11 @@ export default function DashboardPage() {
             Subjects
           </h2>
           {subjects.length === 0 ? (
-            <p className="text-sm text-zinc-500">
-              No subjects yet. Create one to get started.
-            </p>
+            <div className="rounded-xl border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
+              <p className="text-sm text-zinc-500">
+                No subjects yet. Create one to get started.
+              </p>
+            </div>
           ) : (
             <ul className="divide-y divide-zinc-200 rounded-xl border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
               {subjects.map((s) => (
@@ -151,7 +197,7 @@ export default function DashboardPage() {
                     href={`/subjects/${s.id}`}
                     className="flex items-center justify-between px-4 py-4 transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-900"
                   >
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="font-medium text-black dark:text-zinc-100">
                         {s.name}
                       </p>
@@ -160,8 +206,11 @@ export default function DashboardPage() {
                           {s.description}
                         </p>
                       )}
+                      <div className="mt-2">
+                        <MasteryBar mastery={masteryMap[s.id] ?? 0} />
+                      </div>
                     </div>
-                    <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                    <span className="ml-4 shrink-0 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
                       {s.conceptCount} concept{s.conceptCount === 1 ? "" : "s"}
                     </span>
                   </Link>

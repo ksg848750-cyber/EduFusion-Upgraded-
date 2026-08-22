@@ -233,6 +233,18 @@ export async function fetchConceptLearner(
   return res.json();
 }
 
+export type SubjectLearner = {
+  subjectId: string;
+  overallMastery: number;
+  conceptStates: Record<string, { mastery: number; status: string; interactionCount: number; correctCount: number; incorrectCount: number }>;
+  version: number;
+};
+
+export async function fetchSubjectLearner(subjectId: string): Promise<SubjectLearner> {
+  const res = await authedFetch(`/subjects/${subjectId}/learner`);
+  return res.json();
+}
+
 export async function explainConcept(
   subjectId: string,
   conceptId: string,
@@ -593,5 +605,24 @@ export async function submitReassessmentAnswer(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ response, reasoning, selectedOptionId }),
   });
+  return res.json();
+}
+
+export type LearningEvent = {
+  id: string;
+  eventType: string;
+  entityType: string;
+  entityId: string | null;
+  metadata: Record<string, unknown>;
+  timestamp: string;
+};
+
+export type LearningHistory = {
+  subjectId: string;
+  events: LearningEvent[];
+};
+
+export async function fetchLearningHistory(subjectId: string): Promise<LearningHistory> {
+  const res = await authedFetch(`/subjects/${subjectId}/history`);
   return res.json();
 }
